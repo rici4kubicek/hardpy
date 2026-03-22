@@ -10,6 +10,7 @@
     "login": "Login",
     "logout": "Logout",
     "loggedInAs": "Logged in as",
+    "authRequired": "Authentication required",
     "loginOptionalInfo": "Login is optional in this deployment.",
     "lastLaunch": "Last launch:",
     "duration": "Duration",
@@ -56,7 +57,7 @@
     "showChart": "Show chart {{title}}",
     "fullscreenButton": "Open chart in full screen",
     "series": "Series {{number}}"
-  },  
+  },
   "operatorDialog": {
     "defaultTitle": "Message",
     "imageAlt": "Operator message image",
