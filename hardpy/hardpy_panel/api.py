@@ -14,10 +14,11 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Annotated, Any, Final
 from urllib.parse import unquote
 
-from fastapi import FastAPI, Query, Request
+from fastapi import FastAPI, Query, Request, HTTPException, status
 from fastapi.staticfiles import StaticFiles
 
 from hardpy.common.config import ConfigManager, StorageType
+from hardpy.hardpy_panel.auth import AuthService, BasicCredentialsAuthAdapter
 from hardpy.pytest_hardpy.pytest_wrapper import PyTestWrapper
 from hardpy.pytest_hardpy.result.report_synchronizer import StandCloudSynchronizer
 
@@ -62,6 +63,7 @@ app.state.sc_synchronizer = StandCloudSynchronizer()
 app.state.executor = ThreadPoolExecutor(max_workers=1)
 app.state.manual_collect_mode = False
 app.state.selected_tests = []
+app.state.auth_service = AuthService(BasicCredentialsAuthAdapter(), auth_required=False)
 
 
 class Status(str, Enum):
@@ -120,6 +122,7 @@ def set_test_config(config_name: str) -> dict:
     Returns:
         dict: Status of the operation.
     """
+    assert_authenticated()
     config_manager = ConfigManager()
     config_manager.set_current_test_config(config_name)
     try:
@@ -140,6 +143,7 @@ def start_pytest(args: Annotated[list[str] | None, Query()] = None) -> dict:
     Returns:
         dict[str, RunStatus]: run status
     """
+    assert_authenticated()
     if app.state.manual_collect_mode:
         return {"status": Status.BUSY, "message": "Manual collect mode is active"}
 
@@ -165,6 +169,7 @@ def stop_pytest() -> dict:
     Returns:
         dict[str, RunStatus]: run status
     """
+    assert_authenticated()
     if app.state.manual_collect_mode:
         return {"status": Status.BUSY, "message": "Manual collect mode is active"}
 
@@ -183,6 +188,7 @@ def collect_pytest() -> dict:
         dict[str, RunStatus]: run status
 
     """
+    assert_authenticated()
     if app.state.pytest_wrp.collect():
         return {"status": Status.COLLECTED}
     return {"status": Status.BUSY}
@@ -198,6 +204,65 @@ def status() -> dict:
     is_running = app.state.pytest_wrp.is_running()
     status = Status.BUSY if is_running else Status.READY
     return {"status": status}
+
+
+def assert_authenticated() -> None:
+    if not app.state.auth_service.is_authenticated():
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="User must be logged in",
+        )
+
+
+@app.get("/api/auth_status")
+def auth_status() -> dict:
+    return {
+        "authenticated": app.state.auth_service.is_authenticated(),
+        "user": app.state.auth_service.current_user,
+        "auth_required": app.state.auth_service.auth_required,
+    }
+
+
+@app.post("/api/login")
+def login(login_data: dict) -> dict:
+    token = login_data.get("token")
+    username = login_data.get("username")
+    password = login_data.get("password")
+
+    if token:
+        try:
+            user = app.state.auth_service.login_with_token(token)
+        except ValueError as exc:
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail=str(exc),
+            )
+        return {"status": "success", "user": user, "session_token": token}
+
+    if username and password:
+        try:
+            session_token = app.state.auth_service.login(username, password)
+        except ValueError as exc:
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail=str(exc),
+            )
+        return {
+            "status": "success",
+            "user": username,
+            "session_token": session_token,
+        }
+
+    raise HTTPException(
+        status_code=status.HTTP_400_BAD_REQUEST,
+        detail="Provide username/password or token",
+    )
+
+
+@app.post("/api/logout")
+def logout() -> dict:
+    app.state.auth_service.logout()
+    return {"status": "success", "authenticated": False}
 
 
 @app.get("/api/couch")

@@ -1,6 +1,16 @@
 {
   "app": {
     "title": "HardPy Operator Panel",
+    "loginTitle": "Login to HardPy",
+    "loginWithCredentials": "Username/Password",
+    "loginWithToken": "Token",
+    "username": "Username",
+    "password": "Password",
+    "token": "Token",
+    "login": "Login",
+    "logout": "Logout",
+    "loggedInAs": "Logged in as",
+    "loginOptionalInfo": "Login is optional in this deployment.",
     "lastLaunch": "Last launch:",
     "duration": "Duration",
     "seconds": "s",

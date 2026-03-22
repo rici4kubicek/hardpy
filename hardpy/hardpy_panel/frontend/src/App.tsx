@@ -181,7 +181,14 @@ function App({ syncDocumentId }: { syncDocumentId: string }): JSX.Element {
     StatusKey | "unknown"
   >("ready");
   const [lastProgress, setProgress] = React.useState(0);
-  const [isAuthenticated, setIsAuthenticated] = React.useState(true);
+  const [isAuthenticated, setIsAuthenticated] = React.useState(false);
+  const [authUser, setAuthUser] = React.useState<string | null>(null);
+  const [authRequired, setAuthRequired] = React.useState(false);
+  const [authError, setAuthError] = React.useState<string | null>(null);
+  const [loginMode, setLoginMode] = React.useState<"credentials" | "token">("credentials");
+  const [loginUsername, setLoginUsername] = React.useState("");
+  const [loginPassword, setLoginPassword] = React.useState("");
+  const [loginToken, setLoginToken] = React.useState("");
   const [lastRunDuration, setLastRunDuration] = React.useState<number>(0);
 
   // Test config selection state
@@ -252,6 +259,7 @@ function App({ syncDocumentId }: { syncDocumentId: string }): JSX.Element {
       } catch (error) {
         console.error("Failed to load HardPy config:", error);
       } finally {
+        await loadAuthStatus();
         setIsConfigLoaded(true);
       }
     };
@@ -293,6 +301,70 @@ function App({ syncDocumentId }: { syncDocumentId: string }): JSX.Element {
     } catch (error) {
       console.error("Failed to toggle manual collect mode:", error);
     }
+  };
+
+  const loadAuthStatus = async () => {
+    try {
+      const response = await fetch("/api/auth_status");
+      const data = await response.json();
+      setAuthRequired(data.auth_required ?? false);
+
+      if (data.auth_required) {
+        setIsAuthenticated(data.authenticated ?? false);
+      } else {
+        setIsAuthenticated(true);
+      }
+
+      setAuthUser(data.user ?? null);
+    } catch (error) {
+      console.error("Failed to load auth status:", error);
+    }
+  };
+
+  const doLogin = async () => {
+    setAuthError(null);
+
+    const payload:
+      | { username: string; password: string }
+      | { token: string } =
+      loginMode === "token"
+        ? { token: loginToken }
+        : { username: loginUsername, password: loginPassword };
+
+    try {
+      const response = await fetch("/api/login", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+
+      if (!response.ok) {
+        const data = await response.json();
+        setAuthError(data.detail || "Login failed");
+        setIsAuthenticated(false);
+        return;
+      }
+
+      const data = await response.json();
+      setAuthUser(data.user || null);
+      setIsAuthenticated(true);
+      setAuthError(null);
+      setLoginPassword("");
+      setLoginToken("");
+    } catch (error) {
+      setAuthError("Login failed");
+      setIsAuthenticated(false);
+    }
+  };
+
+  const doLogout = async () => {
+    try {
+      await fetch("/api/logout", { method: "POST" });
+    } catch (error) {
+      console.error("Logout failed:", error);
+    }
+    setIsAuthenticated(false);
+    setAuthUser(null);
   };
 
   /**
@@ -815,6 +887,86 @@ function App({ syncDocumentId }: { syncDocumentId: string }): JSX.Element {
     setTestCompletionData(null);
   };
 
+  if (!isAuthenticated) {
+    return (
+      <div
+        style={{
+          display: "flex",
+          justifyContent: "center",
+          alignItems: "center",
+          minHeight: "100vh",
+          backgroundColor: "#f4f7fb",
+          padding: "20px",
+        }}
+      >
+        <Card style={{ width: "100%", maxWidth: "480px", padding: "24px" }}>
+          <H2>{t("app.loginTitle") || "Login required"}</H2>
+
+          <div style={{ marginBottom: "12px" }}>
+            <Button
+              small
+              active={loginMode === "credentials"}
+              onClick={() => setLoginMode("credentials")}
+              style={{ marginRight: "8px" }}
+            >
+              {t("app.loginWithCredentials") || "Credentials"}
+            </Button>
+            <Button
+              small
+              active={loginMode === "token"}
+              onClick={() => setLoginMode("token")}
+            >
+              {t("app.loginWithToken") || "Token"}
+            </Button>
+          </div>
+
+          {loginMode === "credentials" ? (
+            <>
+              <label>{t("app.username") || "Username"}</label>
+              <input
+                type="text"
+                value={loginUsername}
+                onChange={(event) => setLoginUsername(event.target.value)}
+                style={{ width: "100%", marginBottom: "8px" }}
+              />
+              <label>{t("app.password") || "Password"}</label>
+              <input
+                type="password"
+                value={loginPassword}
+                onChange={(event) => setLoginPassword(event.target.value)}
+                style={{ width: "100%", marginBottom: "12px" }}
+              />
+            </>
+          ) : (
+            <>
+              <label>{t("app.token") || "Token"}</label>
+              <input
+                type="password"
+                value={loginToken}
+                onChange={(event) => setLoginToken(event.target.value)}
+                style={{ width: "100%", marginBottom: "12px" }}
+              />
+            </>
+          )}
+
+          <Button intent="primary" onClick={doLogin} style={{ width: "100%" }}>
+            {t("app.login") || "Login"}
+          </Button>
+
+          {authError && (
+            <div style={{ color: "red", marginTop: "10px" }}>{authError}</div>
+          )}
+
+          {!authRequired && (
+            <div style={{ marginTop: "12px", color: "#606d7a" }}>
+              {t("app.loginOptionalInfo") || "Login is optional in this deployment."}
+            </div>
+          )}
+        </Card>
+      </div>
+    );
+  }
+
   return (
     <div className="App">
       <ReloadAlert reload_timeout_s={3} />
@@ -892,6 +1044,25 @@ function App({ syncDocumentId }: { syncDocumentId: string }): JSX.Element {
               }}
             />
           )}
+
+          {authUser && (
+            <Button
+              className="bp3-minimal"
+              text={`${t("app.loggedInAs") || "Logged in as"}: ${authUser}`}
+              disabled
+              style={{ marginRight: "8px" }}
+            />
+          )}
+
+          {(authRequired || authUser) && (
+            <Button
+              className="bp3-minimal"
+              text={t("app.logout") || "Logout"}
+              icon="log-out"
+              onClick={doLogout}
+            />
+          )}
+
           <Popover content={renderSettingsMenu()}>
             <Button className="bp3-minimal" icon="cog" />
           </Popover>

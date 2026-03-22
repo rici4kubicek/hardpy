@@ -42,6 +42,17 @@ After this open page http://localhost:8000/ in the browser.
 When the operator panel is running, you can run tests through the web interface or through
 the pytest launcher (in a terminal or from another application).
 
+### User authentication (optional)
+
+The operator panel now supports a login workflow to control who can run tests. Authentication is handled through the backend adapter, and can be configured in two modes:
+
+- Username/password login (default configured by `hardpy.toml` or optional environment variables `HARDPY_USERNAME`/`HARDPY_PASSWORD`).
+- Token login via `HARDPY_AUTH_TOKEN` or backend adapter token mapping.
+
+Use `/api/login` with either `{ "username": "...", "password": "..." }` or `{ "token": "..." }` from the frontend UI.
+
+When auth is required (`auth_required = true` on `app.state.auth_service`), calls to `/api/start`, `/api/stop`, `/api/collect`, and `/api/set_test_config` are guarded with `401` when not logged in.
+
 ### Start and stop tests
 
 The operator panel contains a test start/stop button in the lower right corner of the screen.
