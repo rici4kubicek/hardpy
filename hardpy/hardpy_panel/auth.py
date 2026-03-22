@@ -11,6 +11,7 @@ from datetime import datetime, timedelta
 from typing import Optional
 
 from hardpy.common.config import ConfigManager
+from hardpy.pytest_hardpy.pytest_call import set_user_name
 
 
 class AuthAdapter(ABC):
@@ -84,6 +85,12 @@ class AuthService:
         self.current_user = username
         self.session_token = secrets.token_hex(32)
         self.session_start_time = datetime.now()
+        # Set user name in test report
+        try:
+            set_user_name(username)
+        except Exception:
+            # Ignore if user name is already set
+            pass
         return self.session_token
 
     def login_with_token(self, token: str) -> str:
@@ -93,6 +100,12 @@ class AuthService:
         self.current_user = user
         self.session_token = token
         self.session_start_time = datetime.now()
+        # Set user name in test report
+        try:
+            set_user_name(user)
+        except Exception:
+            # Ignore if user name is already set
+            pass
         return user
 
     def logout(self) -> None:
