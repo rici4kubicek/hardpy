@@ -39,8 +39,10 @@ class BasicCredentialsAuthAdapter(AuthAdapter):
         config = ConfigManager().config
         expected_user = config.database.user
         expected_pass = config.database.password
-        if (secrets.compare_digest(username, expected_user) and
-                secrets.compare_digest(password, expected_pass)):
+        if expected_user and expected_pass and (
+            secrets.compare_digest(username, expected_user) and
+            secrets.compare_digest(password, expected_pass)
+        ):
             return True
 
         env_user = os.getenv("HARDPY_USERNAME")
