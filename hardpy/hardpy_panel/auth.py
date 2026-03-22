@@ -66,9 +66,6 @@ class BasicCredentialsAuthAdapter(AuthAdapter):
         if sc_token and secrets.compare_digest(token, sc_token):
             return ConfigManager().config.database.user
 
-        # local token by default in DB user/password (not secure, used only for quick test)
-        if secrets.compare_digest(token, "dev"):
-            return ConfigManager().config.database.user
 
         return None
 
