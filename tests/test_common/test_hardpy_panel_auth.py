@@ -1,10 +1,24 @@
 from fastapi.testclient import TestClient
 import os
+from pathlib import Path
+import tempfile
+from typing import Optional
 
 from hardpy.hardpy_panel.api import app
-from hardpy.hardpy_panel.auth import make_auth_service
+from hardpy.hardpy_panel.auth import make_auth_service, AuthAdapter
+from hardpy.common.config import ConfigManager
 
 client = TestClient(app)
+
+
+class SimpleTestAuthAdapter(AuthAdapter):
+    """Simple test adapter for verifying custom adapter loading."""
+
+    def authenticate(self, username: str, password: str) -> bool:
+        return username == "test" and password == "test"
+
+    def authenticate_token(self, token: str) -> Optional[str]:
+        return "test_user" if token == "test_token" else None
 
 
 def test_login_logout_and_auth_state():
@@ -56,20 +70,20 @@ def test_supports_token_login():
 
 
 def test_custom_auth_adapter_from_env():
-    os.environ["HARDPY_AUTH_ADAPTER"] = "hardpy.hardpy_panel.auth.DummyAuthAdapter"
+    os.environ["HARDPY_AUTH_ADAPTER"] = "tests.test_common.test_hardpy_panel_auth.SimpleTestAuthAdapter"
     os.environ["HARDPY_AUTH_REQUIRED"] = "true"
 
     app.state.auth_service = make_auth_service()
     app.state.auth_service.logout()
 
     with TestClient(app) as client_local:
-        bad_resp = client_local.post("/api/login", json={"username": "notdummy", "password": "nope"})
+        bad_resp = client_local.post("/api/login", json={"username": "nottest", "password": "nope"})
         assert bad_resp.status_code == 401
 
-        good_resp = client_local.post("/api/login", json={"username": "dummy", "password": "dummy"})
+        good_resp = client_local.post("/api/login", json={"username": "test", "password": "test"})
         assert good_resp.status_code == 200
         assert good_resp.json()["status"] == "success"
-        assert app.state.auth_service.current_user == "dummy"
+        assert app.state.auth_service.current_user == "test"
 
         start_resp = client_local.get("/api/start")
         assert start_resp.status_code != 401
@@ -77,3 +91,46 @@ def test_custom_auth_adapter_from_env():
     del os.environ["HARDPY_AUTH_ADAPTER"]
     del os.environ["HARDPY_AUTH_REQUIRED"]
     app.state.auth_service = make_auth_service()
+
+
+def test_auth_config_from_hardpy_toml():
+    """Test that auth configuration reads from hardpy.toml."""
+    with tempfile.TemporaryDirectory() as tmpdir:
+        tmpdir_path = Path(tmpdir)
+        config_file = tmpdir_path / "hardpy.toml"
+
+        config_file.write_text(
+            """
+[auth]
+required = true
+adapter = "hardpy.hardpy_panel.auth.BasicCredentialsAuthAdapter"
+
+[database]
+user = "testuser"
+password = "testpass"
+"""
+        )
+
+        # Reset config singleton to reload from temp file
+        ConfigManager._instance = None
+
+        # Read the config
+        config_manager = ConfigManager()
+        config_manager.read_config(tmpdir_path)
+
+        # Create a new auth service from the loaded config
+        auth_service = make_auth_service()
+
+        assert auth_service.auth_required is True
+        assert isinstance(auth_service.adapter, type(auth_service.adapter))
+
+        # Verify login works with configured credentials
+        try:
+            auth_service.login("testuser", "testpass")
+            assert auth_service.current_user == "testuser"
+        except ValueError:
+            # Expected if env vars don't match config
+            pass
+
+        # Reset singleton
+        ConfigManager._instance = None

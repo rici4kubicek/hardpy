@@ -1,0 +1,24 @@
+title = "HardPy with Auth Example"
+tests_name = "Authorization Example"
+
+[database]
+user = "dev"
+password = "dev"
+host = "localhost"
+port = 5984
+
+[frontend]
+host = "localhost"
+port = 8000
+language = "en"
+
+[auth]
+required = true
+adapter = "conftest.CustomAuthAdapter"
+
+[stand_cloud]
+address = "standcloud.io"
+
+[[test_configs]]
+name = "Default"
+description = "Default test configuration"

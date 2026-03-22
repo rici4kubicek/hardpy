@@ -75,17 +75,6 @@ class AuthService:
         self.current_user: Optional[str] = None
         self.session_token: Optional[str] = None
 
-
-@dataclass
-class DummyAuthAdapter(AuthAdapter):
-    """Adapter for integration/local tests to ensure user-provided adapter loading works."""
-
-    def authenticate(self, username: str, password: str) -> bool:
-        return username == "dummy" and password == "dummy"
-
-    def authenticate_token(self, token: str) -> Optional[str]:
-        return "dummy_user" if token == "dummy_token" else None
-
     def login(self, username: str, password: str) -> str:
         if not self.adapter.authenticate(username, password):
             raise ValueError("Invalid username or password")
@@ -113,13 +102,13 @@ class DummyAuthAdapter(AuthAdapter):
 
 def load_auth_adapter() -> AuthAdapter:
     """Load user-defined authentication adapter from module path."""
-    adapter_path = os.getenv(
-        "HARDPY_AUTH_ADAPTER",
-        "hardpy.hardpy_panel.auth.BasicCredentialsAuthAdapter",
-    )
+    config_manager = ConfigManager()
+    config_adapter_path = config_manager.config.auth.adapter
+
+    adapter_path = os.getenv("HARDPY_AUTH_ADAPTER", config_adapter_path)
 
     if "." not in adapter_path:
-        raise ValueError("HARDPY_AUTH_ADAPTER must be a module path to a class")
+        raise ValueError("Auth adapter must be a module path to a class")
 
     module_name, class_name = adapter_path.rsplit(".", 1)
 
@@ -138,7 +127,16 @@ def load_auth_adapter() -> AuthAdapter:
 
 
 def make_auth_service() -> AuthService:
-    auth_required_str = os.getenv("HARDPY_AUTH_REQUIRED", "false").lower()
-    auth_required = auth_required_str in ("1", "true", "yes", "on")
+    config_manager = ConfigManager()
+    config_auth_required = config_manager.config.auth.required
+
+    auth_required_str = os.getenv("HARDPY_AUTH_REQUIRED", "").lower()
+    if auth_required_str in ("1", "true", "yes", "on"):
+        auth_required = True
+    elif auth_required_str in ("0", "false", "no", "off"):
+        auth_required = False
+    else:
+        auth_required = config_auth_required
+
     return AuthService(load_auth_adapter(), auth_required=auth_required)
 

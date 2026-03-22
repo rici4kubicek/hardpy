@@ -46,12 +46,67 @@ the pytest launcher (in a terminal or from another application).
 
 The operator panel now supports a login workflow to control who can run tests. Authentication is handled through the backend adapter, and can be configured in two modes:
 
-- Username/password login (default configured by `hardpy.toml` or optional environment variables `HARDPY_USERNAME`/`HARDPY_PASSWORD`).
-- Token login via `HARDPY_AUTH_TOKEN` or backend adapter token mapping.
+- **Username/password login** (default configured by `hardpy.toml` database section or optional environment variables `HARDPY_USERNAME`/`HARDPY_PASSWORD`).
+- **Token login** via `HARDPY_AUTH_TOKEN` or backend adapter token mapping.
 
-Use `/api/login` with either `{ "username": "...", "password": "..." }` or `{ "token": "..." }` from the frontend UI.
+#### Configuration
 
-When auth is required (`auth_required = true` on `app.state.auth_service`), calls to `/api/start`, `/api/stop`, `/api/collect`, and `/api/set_test_config` are guarded with `401` when not logged in.
+Enable and configure auth in `hardpy.toml`:
+
+```toml
+[auth]
+required = true
+adapter = "hardpy.hardpy_panel.auth.BasicCredentialsAuthAdapter"
+```
+
+**Parameters:**
+
+- `required` (bool, default `false`): Whether login is required to run tests.
+- `adapter` (string, default `hardpy.hardpy_panel.auth.BasicCredentialsAuthAdapter`): Full Python module path to custom auth adapter class.
+
+#### Environment overrides
+
+Environment variables override `hardpy.toml` settings:
+
+- `HARDPY_AUTH_REQUIRED` (`true|false|1|0|yes|no|on|off`): Override `[auth] required`.
+- `HARDPY_AUTH_ADAPTER` (module path): Override `[auth] adapter`.
+- `HARDPY_USERNAME`, `HARDPY_PASSWORD`: Used by `BasicCredentialsAuthAdapter` for credentials.
+- `HARDPY_AUTH_TOKEN`: Used by `BasicCredentialsAuthAdapter` for token login.
+
+#### API endpoints
+
+When auth is enabled, these endpoints are protected:
+
+- `POST /api/login` - login with `{ "username": "...", "password": "..." }` or `{ "token": "..." }`
+- `POST /api/logout` - logout
+- `GET /api/auth_status` - check login status
+- `/api/start`, `/api/stop`, `/api/collect`, `/api/set_test_config` - guarded with 401 when not logged in
+
+#### Custom auth adapter
+
+Implement a custom backend by extending `AuthAdapter`:
+
+```python
+from hardpy.hardpy_panel.auth import AuthAdapter
+from typing import Optional
+
+class YourAuthAdapter(AuthAdapter):
+    def authenticate(self, username: str, password: str) -> bool:
+        # Verify against your backend (e.g., LDAP, REST API, database)
+        return your_verify_logic(username, password)
+
+    def authenticate_token(self, token: str) -> Optional[str]:
+        # Verify token and return username or None
+        return your_token_verify_logic(token)
+```
+
+Then configure in `hardpy.toml`:
+
+```toml
+[auth]
+required = true
+adapter = "your_module.YourAuthAdapter"
+```
 
 ### Start and stop tests
 

@@ -94,6 +94,15 @@ class StandCloudConfig(BaseModel):
     api_key: str = ""
 
 
+class AuthConfig(BaseModel):
+    """Auth configuration for hardpy panel."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    required: bool = False
+    adapter: str = "hardpy.hardpy_panel.auth.BasicCredentialsAuthAdapter"
+
+
 class TestConfig(BaseModel):
     """Test configuration entry."""
 
@@ -122,6 +131,7 @@ class HardpyConfig(BaseModel, extra="allow"):
     database: DatabaseConfig = DatabaseConfig()
     frontend: FrontendConfig = FrontendConfig()
     stand_cloud: StandCloudConfig = StandCloudConfig()
+    auth: AuthConfig = AuthConfig()
     current_test_config: str = ""
     test_configs: list[TestConfig] = []
 
