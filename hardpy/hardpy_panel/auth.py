@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import importlib
 import importlib.util
+import hashlib
 import os
 import secrets
 import sys
@@ -161,6 +162,16 @@ def load_auth_adapter() -> AuthAdapter:
     adapter_cls = getattr(module, class_name, None)
 
     if adapter_cls is None:
+        tests_module = _import_module_from_tests_path(
+            module_name,
+            config_manager.tests_path,
+            register_name=_make_tests_module_alias(module_name, config_manager.tests_path),
+        )
+        if tests_module is not None:
+            module = tests_module
+            adapter_cls = getattr(module, class_name, None)
+
+    if adapter_cls is None:
         raise ImportError(f"Auth adapter class {class_name} not found in {module_name}")
 
     if not issubclass(adapter_cls, AuthAdapter):
@@ -171,7 +182,11 @@ def load_auth_adapter() -> AuthAdapter:
     return adapter_cls()
 
 
-def _import_module_from_tests_path(module_name: str, tests_path: Path) -> ModuleType | None:
+def _import_module_from_tests_path(
+    module_name: str,
+    tests_path: Path,
+    register_name: str | None = None,
+) -> ModuleType | None:
     """Import module from configured tests directory when not on PYTHONPATH."""
     parts = module_name.split(".")
     module_file = tests_path.joinpath(*parts).with_suffix(".py")
@@ -181,14 +196,21 @@ def _import_module_from_tests_path(module_name: str, tests_path: Path) -> Module
     if not source_path.exists():
         return None
 
-    spec = importlib.util.spec_from_file_location(module_name, source_path)
+    spec_name = register_name or module_name
+    spec = importlib.util.spec_from_file_location(spec_name, source_path)
     if spec is None or spec.loader is None:
         return None
 
     module = importlib.util.module_from_spec(spec)
-    sys.modules[module_name] = module
+    sys.modules[spec_name] = module
     spec.loader.exec_module(module)
     return module
+
+
+def _make_tests_module_alias(module_name: str, tests_path: Path) -> str:
+    module_hash = hashlib.sha1(str(tests_path).encode(), usedforsecurity=False).hexdigest()[:12]
+    sanitized_module_name = module_name.replace(".", "_")
+    return f"_hardpy_auth_{sanitized_module_name}_{module_hash}"
 
 
 def make_auth_service() -> AuthService:
