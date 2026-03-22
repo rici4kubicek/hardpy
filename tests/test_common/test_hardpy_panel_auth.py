@@ -6,7 +6,13 @@ from typing import Optional
 
 import pytest
 from fastapi.testclient import TestClient
-from hardpy.hardpy_panel.auth import make_auth_service, load_auth_adapter, AuthAdapter
+from hardpy.hardpy_panel.auth import (
+    make_auth_service,
+    load_auth_adapter,
+    AuthAdapter,
+    AuthService,
+    BasicCredentialsAuthAdapter,
+)
 from hardpy.common.config import ConfigManager
 
 
@@ -40,7 +46,6 @@ adapter = "hardpy.hardpy_panel.auth.BasicCredentialsAuthAdapter"
     ConfigManager._instance = None
     ConfigManager().read_config(tmpdir_path)
 
-    # Force clean import so app state is created from test config.
     sys.modules.pop("hardpy.hardpy_panel.api", None)
     api_module = importlib.import_module("hardpy.hardpy_panel.api")
     yield api_module.app
@@ -55,47 +60,69 @@ def client(app):
 
 
 def test_login_logout_and_auth_state(app, client):
-    # ensure the auth service is required to test login workflow
     app.state.auth_service.auth_required = True
-    app.state.auth_service.logout()
+    app.state.auth_service.logout_all()
 
+    # Unauthenticated status (no token)
     status_resp = client.get("/api/auth_status")
     assert status_resp.status_code == 200
     assert status_resp.json()["authenticated"] is False
 
+    # Wrong credentials rejected
     fail_resp = client.post("/api/login", json={"username": "wrong", "password": "wrong"})
     assert fail_resp.status_code == 401
 
+    # Correct credentials accepted and session token returned
     ok_resp = client.post("/api/login", json={"username": "dev", "password": "dev"})
     assert ok_resp.status_code == 200
-    assert ok_resp.json()["status"] == "success"
-    assert ok_resp.json()["user"] in ("dev", app.state.auth_service.current_user)
+    data = ok_resp.json()
+    assert data["status"] == "success"
+    assert data["user"] == "dev"
+    session_token = data["session_token"]
+    assert session_token and len(session_token) == 64  # token_hex(32)
 
-    status_resp = client.get("/api/auth_status")
+    # Auth status with valid token shows authenticated
+    status_resp = client.get(
+        "/api/auth_status",
+        headers={"Authorization": f"Bearer {session_token}"},
+    )
     assert status_resp.status_code == 200
     assert status_resp.json()["authenticated"] is True
+    assert status_resp.json()["user"] == "dev"
 
-    logout_resp = client.post("/api/logout")
+    # Logout invalidates the specific session
+    logout_resp = client.post(
+        "/api/logout",
+        headers={"Authorization": f"Bearer {session_token}"},
+    )
     assert logout_resp.status_code == 200
     assert logout_resp.json()["authenticated"] is False
 
-    start_resp = client.get("/api/start")
+    # Token rejected after logout
+    start_resp = client.get(
+        "/api/start",
+        headers={"Authorization": f"Bearer {session_token}"},
+    )
     assert start_resp.status_code == 401
 
 
 def test_supports_token_login(app, client, monkeypatch):
-    # configure a known token in environment for adapter
     monkeypatch.setenv("HARDPY_AUTH_TOKEN", "test_token_123")
-    app.state.auth_service.logout()
+    app.state.auth_service.logout_all()
     app.state.auth_service.auth_required = True
 
     token_resp = client.post("/api/login", json={"token": "test_token_123"})
     assert token_resp.status_code == 200
-    assert token_resp.json()["status"] == "success"
-    assert token_resp.json()["user"] is not None
+    data = token_resp.json()
+    assert data["status"] == "success"
+    assert data["user"] is not None
+    session_token = data["session_token"]
+    assert session_token and len(session_token) == 64  # fresh session token, not the api key
 
-    protected_resp = client.get("/api/stop")
-    # authenticated user must not be rejected by auth middleware
+    protected_resp = client.get(
+        "/api/stop",
+        headers={"Authorization": f"Bearer {session_token}"},
+    )
     assert protected_resp.status_code != 401
 
 
@@ -104,17 +131,25 @@ def test_custom_auth_adapter_from_env(app, client, monkeypatch):
     monkeypatch.setenv("HARDPY_AUTH_REQUIRED", "true")
 
     app.state.auth_service = make_auth_service()
-    app.state.auth_service.logout()
+    app.state.auth_service.logout_all()
 
     bad_resp = client.post("/api/login", json={"username": "nottest", "password": "nope"})
     assert bad_resp.status_code == 401
 
     good_resp = client.post("/api/login", json={"username": "test", "password": "test"})
     assert good_resp.status_code == 200
-    assert good_resp.json()["status"] == "success"
-    assert app.state.auth_service.current_user == "test"
+    data = good_resp.json()
+    assert data["status"] == "success"
+    session_token = data["session_token"]
 
-    protected_resp = client.get("/api/stop")
+    # Session stored correctly
+    assert session_token in app.state.auth_service.sessions
+    assert app.state.auth_service.sessions[session_token].username == "test"
+
+    protected_resp = client.get(
+        "/api/stop",
+        headers={"Authorization": f"Bearer {session_token}"},
+    )
     assert protected_resp.status_code != 401
 
     app.state.auth_service = make_auth_service()
@@ -123,9 +158,7 @@ def test_custom_auth_adapter_from_env(app, client, monkeypatch):
 def test_auth_config_from_hardpy_toml():
     """Test that auth configuration reads from hardpy.toml."""
     tmpdir_path = Path(tempfile.mkdtemp(prefix="hardpy-auth-config-"))
-    config_file = tmpdir_path / "hardpy.toml"
-
-    config_file.write_text(
+    (tmpdir_path / "hardpy.toml").write_text(
         """
 [auth]
 required = true
@@ -137,54 +170,55 @@ password = "testpass"
 """
     )
 
-    # Reset config singleton to reload from temp file
     ConfigManager._instance = None
+    ConfigManager().read_config(tmpdir_path)
 
-    # Read the config
-    config_manager = ConfigManager()
-    config_manager.read_config(tmpdir_path)
-
-    # Create a new auth service from the loaded config
     auth_service = make_auth_service()
 
     assert auth_service.auth_required is True
-    assert isinstance(auth_service.adapter, type(auth_service.adapter))
+    assert isinstance(auth_service.adapter, AuthAdapter)
+    assert isinstance(auth_service.adapter, BasicCredentialsAuthAdapter)
 
-    # Verify login works with configured credentials
-    try:
-        auth_service.login("testuser", "testpass")
-        assert auth_service.current_user == "testuser"
-    except ValueError:
-        # Expected if env vars don't match config
-        pass
+    # Login must succeed with the configured credentials
+    session_token = auth_service.login("testuser", "testpass")
+    assert session_token in auth_service.sessions
+    assert auth_service.sessions[session_token].username == "testuser"
 
-    # Reset singleton
     ConfigManager._instance = None
 
 
 def test_session_timeout():
     """Test that sessions automatically expire after timeout."""
-    from datetime import datetime, timedelta
-    from hardpy.hardpy_panel.auth import AuthService, BasicCredentialsAuthAdapter
-    
-    # Create auth service with 1 minute timeout
+    from datetime import datetime, timedelta, timezone
+
     adapter = BasicCredentialsAuthAdapter()
     auth_service = AuthService(adapter, auth_required=True)
-    auth_service.session_timeout_minutes = 1  # 1 minute timeout
-    
-    # Login
-    expected_user = ConfigManager().config.database.user
-    expected_pass = ConfigManager().config.database.password
-    auth_service.login(expected_user, expected_pass)
-    assert auth_service.is_authenticated() is True
-    
-    # Manually set session start time to 2 minutes ago to simulate timeout
-    auth_service.session_start_time = datetime.now() - timedelta(minutes=2)
-    
-    # Check authentication - should auto-logout due to timeout
-    assert auth_service.is_authenticated() is False
-    assert auth_service.current_user is None
-    assert auth_service.session_token is None
+    auth_service.session_timeout_minutes = 1
+
+    # Manually inject a session with a start_time 2 minutes in the past
+    import secrets
+    from hardpy.hardpy_panel.auth import SessionInfo
+
+    expired_token = secrets.token_hex(32)
+    auth_service.sessions[expired_token] = SessionInfo(
+        username="testuser",
+        start_time=datetime.now(tz=timezone.utc) - timedelta(minutes=2),
+        token=expired_token,
+    )
+
+    # Expired token must be rejected
+    result = auth_service.validate_session_token(expired_token)
+    assert result is None
+    assert expired_token not in auth_service.sessions  # cleaned up
+
+    # Fresh token must be accepted
+    fresh_token = secrets.token_hex(32)
+    auth_service.sessions[fresh_token] = SessionInfo(
+        username="testuser",
+        start_time=datetime.now(tz=timezone.utc),
+        token=fresh_token,
+    )
+    assert auth_service.validate_session_token(fresh_token) == "testuser"
 
 
 def test_load_auth_adapter_from_tests_path_conftest_module():
@@ -213,8 +247,7 @@ class CustomAuthAdapter(AuthAdapter):
     )
 
     ConfigManager._instance = None
-    config_manager = ConfigManager()
-    config_manager.read_config(tmpdir_path)
+    ConfigManager().read_config(tmpdir_path)
 
     adapter = load_auth_adapter()
     assert adapter.authenticate("u", "p") is True
