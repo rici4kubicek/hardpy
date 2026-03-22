@@ -372,11 +372,12 @@ async def stand_cloud_sync() -> dict:
 
 
 @app.post("/api/confirm_dialog_box")
-def confirm_dialog_box(dbx_data: dict) -> dict:
+def confirm_dialog_box(dbx_data: dict, user: Annotated[str, Depends(get_current_user)]) -> dict:
     """Confirm dialog box with unified JSON structure.
 
     Args:
         dbx_data: dict with 'result' (pass/fail/confirm) and 'data' (widget data)
+        user (str): Authenticated username (injected via Depends)
 
     Returns:
         dict[str, RunStatus]: run status
@@ -414,11 +415,12 @@ def confirm_dialog_box(dbx_data: dict) -> dict:
 
 
 @app.post("/api/confirm_operator_msg/{is_msg_visible}")
-def confirm_operator_msg(is_msg_visible: str) -> dict:
+def confirm_operator_msg(is_msg_visible: str, user: Annotated[str, Depends(get_current_user)]) -> dict:
     """Confirm operator msg.
 
     Args:
         is_msg_visible (bool): is operator message is visible
+        user (str): Authenticated username (injected via Depends)
 
     Returns:
         dict[str, RunStatus]: run status
@@ -429,11 +431,12 @@ def confirm_operator_msg(is_msg_visible: str) -> dict:
 
 
 @app.post("/api/selected_tests")
-async def set_selected_tests(request: Request) -> dict:
+async def set_selected_tests(request: Request, user: Annotated[str, Depends(get_current_user)]) -> dict:
     """Set the selected tests in the application state.
 
     Args:
         request (Request): The incoming request object.
+        user (str): Authenticated username (injected via Depends)
 
     Returns:
         dict[str, str]: A dictionary containing the
@@ -468,11 +471,12 @@ def get_manual_collect_mode() -> dict:
 
 
 @app.post("/api/manual_collect_mode")
-def set_manual_collect_mode(mode_data: dict) -> dict:
+def set_manual_collect_mode(mode_data: dict, user: Annotated[str, Depends(get_current_user)]) -> dict:
     """Set manual collect mode.
 
     Args:
         mode_data: dict with 'enabled' key
+        user (str): Authenticated username (injected via Depends)
 
     Returns:
         dict[str, str]: operation status
