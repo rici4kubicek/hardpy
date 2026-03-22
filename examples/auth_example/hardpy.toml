@@ -2,6 +2,7 @@ title = "HardPy with Auth Example"
 tests_name = "Authorization Example"
 
 [database]
+storage_type = "couchdb"
 user = "dev"
 password = "dev"
 host = "localhost"
@@ -16,10 +17,3 @@ language = "en"
 required = true
 adapter = "conftest.CustomAuthAdapter"
 session_timeout = 60  # 60 minutes session timeout
-
-[stand_cloud]
-address = "standcloud.io"
-
-[[test_configs]]
-name = "Default"
-description = "Default test configuration"

@@ -283,6 +283,19 @@ function App({ syncDocumentId }: { syncDocumentId: string }): JSX.Element {
     return () => clearInterval(interval);
   }, [authRequired, isAuthenticated]);
 
+  React.useEffect(() => {
+    const onAuthRequired = () => {
+      setIsAuthenticated(false);
+      setAuthUser(null);
+      setAuthError(t("app.authRequired") || "Authentication required");
+    };
+
+    window.addEventListener("hardpy:auth-required", onAuthRequired);
+    return () => {
+      window.removeEventListener("hardpy:auth-required", onAuthRequired);
+    };
+  }, [t]);
+
   /**
    * Wrapper for API calls that handles authentication errors
    */
@@ -734,19 +747,13 @@ function App({ syncDocumentId }: { syncDocumentId: string }): JSX.Element {
       setShowCompletionModalResult(true);
     }
 
-    // Handle authentication state based on database connection
-    if (state === "error") {
-      setIsAuthenticated(false);
-    } else if (isAuthenticated === false) {
-      setIsAuthenticated(true);
-    }
+    // Authentication state is controlled by /api/auth_status and login/logout flow.
   }, [
     rows,
     state,
     lastRunStatus,
     lastProgress,
     lastRunDuration,
-    isAuthenticated,
     appConfig,
     showCompletionModalResult,
     syncDocumentId,

@@ -3,11 +3,15 @@
 from __future__ import annotations
 
 import importlib
+import importlib.util
 import os
 import secrets
+import sys
+from pathlib import Path
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from datetime import datetime, timedelta
+from types import ModuleType
 from typing import Optional
 
 from hardpy.common.config import ConfigManager
@@ -142,7 +146,18 @@ def load_auth_adapter() -> AuthAdapter:
 
     module_name, class_name = adapter_path.rsplit(".", 1)
 
-    module = importlib.import_module(module_name)
+    try:
+        module = importlib.import_module(module_name)
+    except ModuleNotFoundError as exc:
+        if exc.name != module_name:
+            raise
+        module = _import_module_from_tests_path(
+            module_name,
+            config_manager.tests_path,
+        )
+        if module is None:
+            raise
+
     adapter_cls = getattr(module, class_name, None)
 
     if adapter_cls is None:
@@ -154,6 +169,26 @@ def load_auth_adapter() -> AuthAdapter:
         )
 
     return adapter_cls()
+
+
+def _import_module_from_tests_path(module_name: str, tests_path: Path) -> ModuleType | None:
+    """Import module from configured tests directory when not on PYTHONPATH."""
+    parts = module_name.split(".")
+    module_file = tests_path.joinpath(*parts).with_suffix(".py")
+    package_file = tests_path.joinpath(*parts, "__init__.py")
+
+    source_path = module_file if module_file.exists() else package_file
+    if not source_path.exists():
+        return None
+
+    spec = importlib.util.spec_from_file_location(module_name, source_path)
+    if spec is None or spec.loader is None:
+        return None
+
+    module = importlib.util.module_from_spec(spec)
+    sys.modules[module_name] = module
+    spec.loader.exec_module(module)
+    return module
 
 
 def make_auth_service() -> AuthService:

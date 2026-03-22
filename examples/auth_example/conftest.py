@@ -9,9 +9,11 @@ for HardPy to verify credentials against external systems.
 
 import pytest
 from typing import Optional
+from pathlib import Path
+import datetime
 
 from hardpy.hardpy_panel.auth import AuthAdapter
-
+from hardpy import JsonLoader, get_current_report
 
 class CustomAuthAdapter(AuthAdapter):
     """
@@ -81,3 +83,32 @@ class CustomAuthAdapter(AuthAdapter):
 def custom_adapter():
     """Fixture providing a custom auth adapter instance for tests."""
     return CustomAuthAdapter()
+
+
+class CurrentMinute:
+    """Class example."""
+
+    def get_minute(self):
+        """Get current minute."""
+        current_time = datetime.datetime.now()  # noqa: DTZ005
+        return int(current_time.strftime("%M"))
+
+
+@pytest.fixture
+def current_minute():
+    current_time = CurrentMinute()
+    yield current_time
+
+
+
+def save_report_to_dir():
+    report = get_current_report()
+    if report:
+        loader = JsonLoader(Path.cwd() / "reports")
+        loader.load(report)
+
+
+@pytest.fixture(scope="session", autouse=True)
+def fill_actions_after_test(post_run_functions: list):
+    post_run_functions.append(save_report_to_dir)
+    yield

@@ -195,15 +195,15 @@ def collect_pytest() -> dict:
 
 
 @app.get("/api/status")
-def status() -> dict:
+def pytest_status() -> dict:
     """Get pytest subprocess status.
 
     Returns:
         dict[str, RunStatus]: run status
     """
     is_running = app.state.pytest_wrp.is_running()
-    status = Status.BUSY if is_running else Status.READY
-    return {"status": status}
+    run_status = Status.BUSY if is_running else Status.READY
+    return {"status": run_status}
 
 
 def assert_authenticated() -> None:

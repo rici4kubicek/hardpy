@@ -44,12 +44,27 @@ class StartStopButton extends React.Component<Props, State> {
    * @param {string} uri - The URI to which the fetch request is made.
    * @private
    */
-  private hardpy_call(uri: string): void {
-    fetch(uri).then((response) => {
-      if (response.ok) {
-        return response.text();
-      }
-    });
+  private async hardpy_call(uri: string): Promise<void> {
+    const response = await fetch(uri);
+    if (response.ok) {
+      return;
+    }
+
+    if (response.status === 401) {
+      // Notify app to switch back to login screen.
+      window.dispatchEvent(new CustomEvent("hardpy:auth-required"));
+      return;
+    }
+
+    let detail = "";
+    try {
+      const data = await response.json();
+      detail = data?.detail || data?.message || "";
+    } catch {
+      detail = "";
+    }
+
+    console.error(`Request to ${uri} failed with ${response.status}${detail ? `: ${detail}` : ""}`);
   }
 
   /**
@@ -65,7 +80,7 @@ class StartStopButton extends React.Component<Props, State> {
       this.props.onTestRunStart();
     }
 
-    this.hardpy_call("api/start");
+    void this.hardpy_call("/api/start");
   }
 
   /**
@@ -81,7 +96,7 @@ class StartStopButton extends React.Component<Props, State> {
     if (this.state.isStopButtonDisabled) {
       return;
     }
-    this.hardpy_call("api/stop");
+    void this.hardpy_call("/api/stop");
 
     // Disable the stop button for some time to prevent multiple rapid clicks
     this.setState({ isStopButtonDisabled: true });
