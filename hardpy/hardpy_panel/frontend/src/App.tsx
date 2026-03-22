@@ -388,11 +388,12 @@ function App({ syncDocumentId }: { syncDocumentId: string }): JSX.Element {
 
       if (data.auth_required) {
         setIsAuthenticated(data.authenticated ?? false);
+        setAuthUser(data.user ?? null);
       } else {
         setIsAuthenticated(true);
+        // Auth is disabled: hide auth-specific UI state in the header.
+        setAuthUser(null);
       }
-
-      setAuthUser(data.user ?? null);
     } catch (error) {
       console.error("Failed to load auth status:", error);
       // On error, assume authentication is required and user is not authenticated
@@ -1125,7 +1126,7 @@ function App({ syncDocumentId }: { syncDocumentId: string }): JSX.Element {
             />
           )}
 
-          {authUser && (
+          {authRequired && authUser && (
             <Button
               className="bp3-minimal"
               text={`${t("app.loggedInAs") || "Logged in as"}: ${authUser}`}
@@ -1134,7 +1135,7 @@ function App({ syncDocumentId }: { syncDocumentId: string }): JSX.Element {
             />
           )}
 
-          {(authRequired || authUser) && (
+          {authRequired && (
             <Button
               className="bp3-minimal"
               text={t("app.logout") || "Logout"}
