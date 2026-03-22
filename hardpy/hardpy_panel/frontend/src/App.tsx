@@ -227,7 +227,7 @@ function App({ syncDocumentId }: { syncDocumentId: string }): JSX.Element {
   React.useEffect(() => {
     const loadConfig = async () => {
       try {
-        const response = await fetch("/api/hardpy_config");
+        const response = await authenticatedFetch("/api/hardpy_config");
         const config = await response.json();
         setAppConfig(config);
 
@@ -237,7 +237,7 @@ function App({ syncDocumentId }: { syncDocumentId: string }): JSX.Element {
         }
 
         // Load manual collect mode state
-        const manualCollectResponse = await fetch("/api/manual_collect_mode");
+        const manualCollectResponse = await authenticatedFetch("/api/manual_collect_mode");
         const manualCollectData = await manualCollectResponse.json();
         setManualCollectMode(manualCollectData.manual_collect_mode);
 
@@ -267,13 +267,45 @@ function App({ syncDocumentId }: { syncDocumentId: string }): JSX.Element {
     loadConfig();
   }, []);
 
+  // Periodic authentication status checking
+  React.useEffect(() => {
+    if (!authRequired || !isAuthenticated) {
+      return;
+    }
+
+    const checkAuthStatus = () => {
+      loadAuthStatus();
+    };
+
+    // Check every 5 minutes
+    const interval = setInterval(checkAuthStatus, 5 * 60 * 1000);
+
+    return () => clearInterval(interval);
+  }, [authRequired, isAuthenticated]);
+
+  /**
+   * Wrapper for API calls that handles authentication errors
+   */
+  const authenticatedFetch = async (url: string, options?: RequestInit) => {
+    const response = await fetch(url, options);
+    
+    if (response.status === 401 && authRequired) {
+      // Session expired, show login dialog
+      setIsAuthenticated(false);
+      setAuthUser(null);
+      throw new Error("Authentication required");
+    }
+    
+    return response;
+  };
+
   /**
    * Toggles manual collect mode
    */
   const toggleManualCollectMode = async () => {
     try {
       const newMode = !manualCollectMode;
-      const response = await fetch("/api/manual_collect_mode", {
+      const response = await authenticatedFetch("/api/manual_collect_mode", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -306,6 +338,14 @@ function App({ syncDocumentId }: { syncDocumentId: string }): JSX.Element {
   const loadAuthStatus = async () => {
     try {
       const response = await fetch("/api/auth_status");
+      if (response.status === 401) {
+        // Not authenticated
+        setAuthRequired(true);
+        setIsAuthenticated(false);
+        setAuthUser(null);
+        return;
+      }
+      
       const data = await response.json();
       setAuthRequired(data.auth_required ?? false);
 
@@ -318,6 +358,10 @@ function App({ syncDocumentId }: { syncDocumentId: string }): JSX.Element {
       setAuthUser(data.user ?? null);
     } catch (error) {
       console.error("Failed to load auth status:", error);
+      // On error, assume authentication is required and user is not authenticated
+      setAuthRequired(true);
+      setIsAuthenticated(false);
+      setAuthUser(null);
     }
   };
 
@@ -887,7 +931,7 @@ function App({ syncDocumentId }: { syncDocumentId: string }): JSX.Element {
     setTestCompletionData(null);
   };
 
-  if (!isAuthenticated) {
+  if (!isAuthenticated && authRequired) {
     return (
       <div
         style={{
@@ -955,12 +999,6 @@ function App({ syncDocumentId }: { syncDocumentId: string }): JSX.Element {
 
           {authError && (
             <div style={{ color: "red", marginTop: "10px" }}>{authError}</div>
-          )}
-
-          {!authRequired && (
-            <div style={{ marginTop: "12px", color: "#606d7a" }}>
-              {t("app.loginOptionalInfo") || "Login is optional in this deployment."}
-            </div>
           )}
         </Card>
       </div>
