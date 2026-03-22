@@ -11,12 +11,13 @@ import sys
 from pathlib import Path
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from types import ModuleType
 from typing import Optional
 
 from hardpy.common.config import ConfigManager
 from hardpy.pytest_hardpy.pytest_call import set_user_name
+from hardpy.pytest_hardpy.utils.exception import DuplicateParameterError
 
 
 class AuthAdapter(ABC):
@@ -31,7 +32,6 @@ class AuthAdapter(ABC):
         raise NotImplementedError
 
 
-@dataclass
 class BasicCredentialsAuthAdapter(AuthAdapter):
     """Simple adapter for local username/password plus optional token."""
 
@@ -94,18 +94,18 @@ class AuthService:
         """Authenticate user with username/password and create session."""
         if not self.adapter.authenticate(username, password):
             raise ValueError("Invalid username or password")
-        
+
         session_token = secrets.token_hex(32)
         self.sessions[session_token] = SessionInfo(
             username=username,
-            start_time=datetime.now(),
+            start_time=datetime.now(tz=timezone.utc),
             token=session_token,
         )
-        
+
         # Set user name in test report
         try:
             set_user_name(username)
-        except Exception:
+        except DuplicateParameterError:
             # Ignore if user name is already set
             pass
         return session_token
@@ -115,18 +115,18 @@ class AuthService:
         user = self.adapter.authenticate_token(token)
         if not user:
             raise ValueError("Invalid token")
-        
+
         session_token = secrets.token_hex(32)
         self.sessions[session_token] = SessionInfo(
             username=user,
-            start_time=datetime.now(),
+            start_time=datetime.now(tz=timezone.utc),
             token=session_token,
         )
-        
+
         # Set user name in test report
         try:
             set_user_name(user)
-        except Exception:
+        except DuplicateParameterError:
             # Ignore if user name is already set
             pass
         return session_token
@@ -138,22 +138,26 @@ class AuthService:
 
         if not token or token not in self.sessions:
             return None
-        
+
         session = self.sessions[token]
-        
+
         # Check session timeout
         if self.session_timeout_minutes > 0:
-            elapsed = datetime.now() - session.start_time
+            elapsed = datetime.now(tz=timezone.utc) - session.start_time
             if elapsed > timedelta(minutes=self.session_timeout_minutes):
                 del self.sessions[token]  # Invalidate expired session
                 return None
-        
+
         return session.username
 
     def logout(self, token: str) -> None:
         """Logout user by invalidating session token."""
         if token in self.sessions:
             del self.sessions[token]
+
+    def logout_all(self) -> None:
+        """Invalidate all active sessions (admin / test-reset use only)."""
+        self.sessions.clear()
 
     @property
     def is_authenticated(self) -> bool:
@@ -253,4 +257,3 @@ def make_auth_service() -> AuthService:
         auth_required = config_auth_required
 
     return AuthService(load_auth_adapter(), auth_required=auth_required)
-
