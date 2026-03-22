@@ -9,12 +9,13 @@ import logging
 import os
 import re
 from concurrent.futures import ThreadPoolExecutor
+from datetime import datetime, timedelta
 from enum import Enum
 from pathlib import Path
-from typing import TYPE_CHECKING, Annotated, Any, Final
+from typing import TYPE_CHECKING, Annotated, Any, Final, Optional
 from urllib.parse import unquote
 
-from fastapi import FastAPI, Query, Request, HTTPException, status
+from fastapi import FastAPI, Query, Request, HTTPException, status, Depends
 from fastapi.staticfiles import StaticFiles
 
 from hardpy.common.config import ConfigManager, StorageType
@@ -103,6 +104,49 @@ async def sync_stand_cloud(sc_sync_interval_minutes: int) -> None:
         await asyncio.sleep(sc_sync_interval)
 
 
+def get_session_token(request: Request) -> Optional[str]:
+    """Extract session token from request headers.
+    
+    Token can be provided in:
+    1. Authorization header as "Bearer <token>"
+    2. x-session-token header
+    """
+    # Try Authorization header first (Bearer scheme)
+    auth_header = request.headers.get("Authorization", "")
+    if auth_header.startswith("Bearer "):
+        return auth_header[7:]  # Remove "Bearer " prefix
+    
+    # Try x-session-token header
+    return request.headers.get("x-session-token")
+
+
+def get_current_user(request: Request) -> str:
+    """Dependency function that validates session token and returns authenticated username.
+    
+    This function is used with FastAPI's Depends() to automatically validate
+    that requests contain a valid session token.
+    
+    Args:
+        request: The FastAPI Request object
+        
+    Returns:
+        str: The authenticated username
+        
+    Raises:
+        HTTPException: If the request is not authenticated
+    """
+    token = get_session_token(request)
+    username = app.state.auth_service.validate_session_token(token)
+    
+    if not username:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="User must be logged in with a valid session token",
+        )
+    
+    return username
+
+
 @app.get("/api/hardpy_config")
 def hardpy_config() -> dict:
     """Get config of HardPy.
@@ -114,15 +158,15 @@ def hardpy_config() -> dict:
 
 
 @app.post("/api/set_test_config/{config_name}")
-def set_test_config(config_name: str) -> dict:
+def set_test_config(config_name: str, user: Annotated[str, Depends(get_current_user)]) -> dict:
     """Set the current test configuration.
 
     Args:
         config_name (str): Name of the test configuration to set
+        user (str): Authenticated username (injected via Depends)
     Returns:
         dict: Status of the operation.
     """
-    assert_authenticated()
     config_manager = ConfigManager()
     config_manager.set_current_test_config(config_name)
     try:
@@ -134,16 +178,16 @@ def set_test_config(config_name: str) -> dict:
 
 
 @app.get("/api/start")
-def start_pytest(args: Annotated[list[str] | None, Query()] = None) -> dict:
+def start_pytest(args: Annotated[list[str] | None, Query()] = None, user: Annotated[str, Depends(get_current_user)] = None) -> dict:
     """Start pytest subprocess.
 
     Args:
         args: List of arguments in key=value format
+        user (str): Authenticated username (injected via Depends)
 
     Returns:
         dict[str, RunStatus]: run status
     """
-    assert_authenticated()
     if app.state.manual_collect_mode:
         return {"status": Status.BUSY, "message": "Manual collect mode is active"}
 
@@ -163,13 +207,15 @@ def start_pytest(args: Annotated[list[str] | None, Query()] = None) -> dict:
 
 
 @app.get("/api/stop")
-def stop_pytest() -> dict:
+def stop_pytest(user: Annotated[str, Depends(get_current_user)]) -> dict:
     """Stop pytest subprocess.
+
+    Args:
+        user (str): Authenticated username (injected via Depends)
 
     Returns:
         dict[str, RunStatus]: run status
     """
-    assert_authenticated()
     if app.state.manual_collect_mode:
         return {"status": Status.BUSY, "message": "Manual collect mode is active"}
 
@@ -181,14 +227,16 @@ def stop_pytest() -> dict:
 
 
 @app.get("/api/collect")
-def collect_pytest() -> dict:
+def collect_pytest(user: Annotated[str, Depends(get_current_user)]) -> dict:
     """Collect pytest subprocess.
+
+    Args:
+        user (str): Authenticated username (injected via Depends)
 
     Returns:
         dict[str, RunStatus]: run status
 
     """
-    assert_authenticated()
     if app.state.pytest_wrp.collect():
         return {"status": Status.COLLECTED}
     return {"status": Status.BUSY}
@@ -206,32 +254,27 @@ def pytest_status() -> dict:
     return {"status": run_status}
 
 
-def assert_authenticated() -> None:
-    if not app.state.auth_service.is_authenticated():
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="User must be logged in",
-        )
-
-
 @app.get("/api/auth_status")
-def auth_status() -> dict:
+def auth_status(request: Request) -> dict:
     auth_service = app.state.auth_service
-    response = {
-        "authenticated": auth_service.is_authenticated(),
-        "user": auth_service.current_user,
+    token = get_session_token(request)
+    # Always call validate_session_token - handles auth_required=False case correctly
+    username = auth_service.validate_session_token(token or "")
+
+    response: dict = {
+        "authenticated": username is not None,
+        "user": username,
         "auth_required": auth_service.auth_required,
     }
-    
+
     # Add session expiry info if authenticated and timeout is configured
-    if (auth_service.is_authenticated() and 
-        auth_service.session_timeout_minutes > 0 and 
-        auth_service.session_start_time):
-        from datetime import datetime, timedelta
-        expiry_time = auth_service.session_start_time + timedelta(minutes=auth_service.session_timeout_minutes)
+    if (username and token and token in auth_service.sessions and
+            auth_service.session_timeout_minutes > 0):
+        session = auth_service.sessions[token]
+        expiry_time = session.start_time + timedelta(minutes=auth_service.session_timeout_minutes)
         response["session_expires_at"] = expiry_time.isoformat()
         response["session_timeout_minutes"] = auth_service.session_timeout_minutes
-    
+
     return response
 
 
@@ -243,13 +286,16 @@ def login(login_data: dict) -> dict:
 
     if token:
         try:
-            user = app.state.auth_service.login_with_token(token)
+            session_token = app.state.auth_service.login_with_token(token)
         except ValueError as exc:
             raise HTTPException(
                 status_code=status.HTTP_401_UNAUTHORIZED,
                 detail=str(exc),
             )
-        return {"status": "success", "user": user, "session_token": token}
+        # Get username from the session
+        session = app.state.auth_service.sessions.get(session_token)
+        user = session.username if session else None
+        return {"status": "success", "user": user, "session_token": session_token}
 
     if username and password:
         try:
@@ -272,8 +318,10 @@ def login(login_data: dict) -> dict:
 
 
 @app.post("/api/logout")
-def logout() -> dict:
-    app.state.auth_service.logout()
+def logout(request: Request) -> dict:
+    token = get_session_token(request)
+    if token:
+        app.state.auth_service.logout(token)
     return {"status": "success", "authenticated": False}
 
 

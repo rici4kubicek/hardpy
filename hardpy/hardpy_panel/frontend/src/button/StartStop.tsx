@@ -40,18 +40,24 @@ class StartStopButton extends React.Component<Props, State> {
   }
 
   /**
-   * Makes a fetch call to the specified URI.
+   * Makes a fetch call to the specified URI, including session token from sessionStorage.
    * @param {string} uri - The URI to which the fetch request is made.
    * @private
    */
   private async hardpy_call(uri: string): Promise<void> {
-    const response = await fetch(uri);
+    const token = sessionStorage.getItem("hardpy_session_token");
+    const headers: Record<string, string> = token
+      ? { Authorization: `Bearer ${token}` }
+      : {};
+
+    const response = await fetch(uri, { headers });
     if (response.ok) {
       return;
     }
 
     if (response.status === 401) {
       // Notify app to switch back to login screen.
+      sessionStorage.removeItem("hardpy_session_token");
       window.dispatchEvent(new CustomEvent("hardpy:auth-required"));
       return;
     }

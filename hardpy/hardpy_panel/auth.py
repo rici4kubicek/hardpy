@@ -73,66 +73,94 @@ class BasicCredentialsAuthAdapter(AuthAdapter):
         return None
 
 
+@dataclass
+class SessionInfo:
+    """Session token information."""
+    username: str
+    start_time: datetime
+    token: str
+
+
 class AuthService:
-    """Stateful auth service for API session management."""
+    """Auth service for API session management with per-request token validation."""
 
     def __init__(self, adapter: AuthAdapter, auth_required: bool = False) -> None:
         self.adapter = adapter
         self.auth_required = auth_required
-        self.current_user: Optional[str] = None
-        self.session_token: Optional[str] = None
-        self.session_start_time: Optional[datetime] = None
         self.session_timeout_minutes = ConfigManager().config.auth.session_timeout
+        # Dict mapping session tokens to session info
+        self.sessions: dict[str, SessionInfo] = {}
 
     def login(self, username: str, password: str) -> str:
+        """Authenticate user with username/password and create session."""
         if not self.adapter.authenticate(username, password):
             raise ValueError("Invalid username or password")
-        self.current_user = username
-        self.session_token = secrets.token_hex(32)
-        self.session_start_time = datetime.now()
+        
+        session_token = secrets.token_hex(32)
+        self.sessions[session_token] = SessionInfo(
+            username=username,
+            start_time=datetime.now(),
+            token=session_token,
+        )
+        
         # Set user name in test report
         try:
             set_user_name(username)
         except Exception:
             # Ignore if user name is already set
             pass
-        return self.session_token
+        return session_token
 
     def login_with_token(self, token: str) -> str:
+        """Authenticate user with provided token and create session."""
         user = self.adapter.authenticate_token(token)
         if not user:
             raise ValueError("Invalid token")
-        self.current_user = user
-        self.session_token = token
-        self.session_start_time = datetime.now()
+        
+        session_token = secrets.token_hex(32)
+        self.sessions[session_token] = SessionInfo(
+            username=user,
+            start_time=datetime.now(),
+            token=session_token,
+        )
+        
         # Set user name in test report
         try:
             set_user_name(user)
         except Exception:
             # Ignore if user name is already set
             pass
-        return user
+        return session_token
 
-    def logout(self) -> None:
-        self.current_user = None
-        self.session_token = None
-        self.session_start_time = None
-
-    def is_authenticated(self) -> bool:
+    def validate_session_token(self, token: Optional[str]) -> Optional[str]:
+        """Validate session token and return username if valid, None otherwise."""
         if not self.auth_required:
-            return True
+            return "guest"
+
+        if not token or token not in self.sessions:
+            return None
         
-        if self.current_user is None:
-            return False
-            
+        session = self.sessions[token]
+        
         # Check session timeout
-        if self.session_timeout_minutes > 0 and self.session_start_time:
-            elapsed = datetime.now() - self.session_start_time
+        if self.session_timeout_minutes > 0:
+            elapsed = datetime.now() - session.start_time
             if elapsed > timedelta(minutes=self.session_timeout_minutes):
-                self.logout()  # Auto logout on timeout
-                return False
-                
-        return True
+                del self.sessions[token]  # Invalidate expired session
+                return None
+        
+        return session.username
+
+    def logout(self, token: str) -> None:
+        """Logout user by invalidating session token."""
+        if token in self.sessions:
+            del self.sessions[token]
+
+    @property
+    def is_authenticated(self) -> bool:
+        """Deprecated: Use validate_session_token() instead for per-request validation."""
+        # This property is kept for backwards compatibility but should not be used
+        return not self.auth_required
 
 
 def load_auth_adapter() -> AuthAdapter:

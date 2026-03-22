@@ -297,18 +297,33 @@ function App({ syncDocumentId }: { syncDocumentId: string }): JSX.Element {
   }, [t]);
 
   /**
-   * Wrapper for API calls that handles authentication errors
+   * Wrapper for API calls that handles authentication errors.
+   * Automatically includes the session token from sessionStorage.
    */
   const authenticatedFetch = async (url: string, options?: RequestInit) => {
-    const response = await fetch(url, options);
-    
+    const token = sessionStorage.getItem("hardpy_session_token");
+    const authHeaders: Record<string, string> = token
+      ? { Authorization: `Bearer ${token}` }
+      : {};
+
+    const mergedOptions: RequestInit = {
+      ...options,
+      headers: {
+        ...authHeaders,
+        ...(options?.headers as Record<string, string> | undefined),
+      },
+    };
+
+    const response = await fetch(url, mergedOptions);
+
     if (response.status === 401 && authRequired) {
       // Session expired, show login dialog
+      sessionStorage.removeItem("hardpy_session_token");
       setIsAuthenticated(false);
       setAuthUser(null);
       throw new Error("Authentication required");
     }
-    
+
     return response;
   };
 
@@ -335,13 +350,13 @@ function App({ syncDocumentId }: { syncDocumentId: string }): JSX.Element {
         const testsToSend = selectedTests || [];
         const testsJsonString = JSON.stringify(testsToSend);
 
-        fetch(`/api/selected_tests`, {
+        authenticatedFetch(`/api/selected_tests`, {
           method: "POST",
           headers: {
             "Content-Type": "application/json",
           },
           body: testsJsonString,
-        }).then((response) => response.json());
+        }).then((response) => response.json()).catch(console.error);
       }
     } catch (error) {
       console.error("Failed to toggle manual collect mode:", error);
@@ -350,7 +365,10 @@ function App({ syncDocumentId }: { syncDocumentId: string }): JSX.Element {
 
   const loadAuthStatus = async () => {
     try {
-      const response = await fetch("/api/auth_status");
+      const token = sessionStorage.getItem("hardpy_session_token");
+      const response = await fetch("/api/auth_status", {
+        headers: token ? { Authorization: `Bearer ${token}` } : {},
+      });
       if (response.status === 401) {
         // Not authenticated
         setAuthRequired(true);
@@ -403,6 +421,9 @@ function App({ syncDocumentId }: { syncDocumentId: string }): JSX.Element {
       }
 
       const data = await response.json();
+      if (data.session_token) {
+        sessionStorage.setItem("hardpy_session_token", data.session_token);
+      }
       setAuthUser(data.user || null);
       setIsAuthenticated(true);
       setAuthError(null);
@@ -416,10 +437,15 @@ function App({ syncDocumentId }: { syncDocumentId: string }): JSX.Element {
 
   const doLogout = async () => {
     try {
-      await fetch("/api/logout", { method: "POST" });
+      const token = sessionStorage.getItem("hardpy_session_token");
+      await fetch("/api/logout", {
+        method: "POST",
+        headers: token ? { Authorization: `Bearer ${token}` } : {},
+      });
     } catch (error) {
       console.error("Logout failed:", error);
     }
+    sessionStorage.removeItem("hardpy_session_token");
     setIsAuthenticated(false);
     setAuthUser(null);
   };
@@ -453,7 +479,7 @@ function App({ syncDocumentId }: { syncDocumentId: string }): JSX.Element {
 
     try {
       // Update the backend with the selected config
-      const response = await fetch(
+      const response = await authenticatedFetch(
         `/api/set_test_config/${encodeURIComponent(configName)}`,
         {
           method: "POST",

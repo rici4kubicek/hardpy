@@ -691,7 +691,11 @@ export function StartConfirmationDialog(props: Readonly<Props>): JSX.Element {
    */
   const handleClose = () => {
     setDialogOpen(false);
-    fetch("api/stop")
+    const token = sessionStorage.getItem("hardpy_session_token");
+    const headers: Record<string, string> = token
+      ? { Authorization: `Bearer ${token}` }
+      : {};
+    fetch("api/stop", { headers })
       .then((response) => {
         if (response.ok) {
           return response.text();
