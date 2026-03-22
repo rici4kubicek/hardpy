@@ -44,10 +44,11 @@ the pytest launcher (in a terminal or from another application).
 
 ### User authentication (optional)
 
-The operator panel now supports a login workflow to control who can run tests. Authentication is handled through the backend adapter, and can be configured in two modes:
+The operator panel supports a login workflow to control who can run tests.
+Authentication is handled through a backend adapter and can be configured in two modes:
 
-- **Username/password login** (default configured by `hardpy.toml` database section or optional environment variables `HARDPY_USERNAME`/`HARDPY_PASSWORD`).
-- **Token login** via `HARDPY_AUTH_TOKEN` or backend adapter token mapping.
+- **Username/password login** using credentials from the `[database]` section of `hardpy.toml` or environment variables.
+- **Token login** via a token verified by the adapter.
 
 #### Configuration
 
@@ -57,12 +58,14 @@ Enable and configure auth in `hardpy.toml`:
 [auth]
 required = true
 adapter = "hardpy.hardpy_panel.auth.BasicCredentialsAuthAdapter"
+session_timeout = 60
 ```
 
 **Parameters:**
 
 - `required` (bool, default `false`): Whether login is required to run tests.
-- `adapter` (string, default `hardpy.hardpy_panel.auth.BasicCredentialsAuthAdapter`): Full Python module path to custom auth adapter class.
+- `adapter` (string, default `hardpy.hardpy_panel.auth.BasicCredentialsAuthAdapter`): Full Python module path to the auth adapter class.
+- `session_timeout` (int, default `0`): Session lifetime in minutes since login. Set to `0` to disable (sessions never expire).
 
 #### Environment overrides
 
@@ -73,14 +76,50 @@ Environment variables override `hardpy.toml` settings:
 - `HARDPY_USERNAME`, `HARDPY_PASSWORD`: Used by `BasicCredentialsAuthAdapter` for credentials.
 - `HARDPY_AUTH_TOKEN`: Used by `BasicCredentialsAuthAdapter` for token login.
 
+#### Built-in adapter credential priority
+
+`BasicCredentialsAuthAdapter` resolves credentials in the following order:
+
+**Username/password login:**
+
+1. `[database] user` / `[database] password` from `hardpy.toml`
+2. `HARDPY_USERNAME` / `HARDPY_PASSWORD` environment variables (if set, take priority over `hardpy.toml`)
+
+**Token login:**
+
+1. `HARDPY_AUTH_TOKEN` environment variable
+2. `[stand_cloud] api-key` from `hardpy.toml` (if configured)
+
 #### API endpoints
 
-When auth is enabled, these endpoints are protected:
+The following endpoints are always available:
 
-- `POST /api/login` - login with `{ "username": "...", "password": "..." }` or `{ "token": "..." }`
-- `POST /api/logout` - logout
-- `GET /api/auth_status` - check login status
-- `/api/start`, `/api/stop`, `/api/collect`, `/api/set_test_config` - guarded with 401 when not logged in
+- `POST /api/login` — login with `{ "username": "...", "password": "..." }` or `{ "token": "..." }`
+- `POST /api/logout` — logout
+- `GET /api/auth_status` — check login status
+
+Response from `GET /api/auth_status`:
+
+```json
+{
+  "authenticated": true,
+  "user": "admin",
+  "auth_required": true,
+  "session_expires_at": "2026-03-22T10:30:00",
+  "session_timeout_minutes": 60
+}
+```
+
+The `session_expires_at` and `session_timeout_minutes` fields are only present when `session_timeout > 0` and the user is authenticated.
+
+When auth is enabled and the user is not logged in, the following endpoints return HTTP 401:
+
+- `/api/start`, `/api/stop`, `/api/collect`, `/api/set_test_config`
+
+#### User name in test report
+
+When a user logs in, their username is automatically written to the test report via [`set_user_name`](pytest_hardpy.md#set_user_name).
+If your test plan also calls `set_user_name` manually, it will raise `DuplicateParameterError`.
 
 #### Custom auth adapter
 
@@ -100,13 +139,24 @@ class YourAuthAdapter(AuthAdapter):
         return your_token_verify_logic(token)
 ```
 
-Then configure in `hardpy.toml`:
+The adapter module is resolved first from the Python path, then from the configured tests directory.
+This means you can reference a class in your `conftest.py` or a local module without any `PYTHONPATH` setup:
 
 ```toml
 [auth]
 required = true
-adapter = "your_module.YourAuthAdapter"
+adapter = "conftest.YourAuthAdapter"
 ```
+
+For an installable adapter, configure the full module path:
+
+```toml
+[auth]
+required = true
+adapter = "your_package.your_module.YourAuthAdapter"
+```
+
+See the [authentication example](../examples/auth_example.md) for a working implementation.
 
 ### Start and stop tests
 

@@ -31,6 +31,11 @@ If tests are run via [hardpy panel](hardpy_panel.md), then the pytest-hardpy plu
 Writes a string with a **HardPy** operator panel user name.
 When called again, the exception `DuplicateParameterError` will be raised.
 
+???+ note
+    When [panel authentication](hardpy_panel.md#user-authentication-optional) is enabled,
+    the logged-in username is written to the report automatically on login.
+    Calling `set_user_name` manually in that case will raise `DuplicateParameterError`.
+
 **Arguments:**
 
 - `name` *(str)*: User name

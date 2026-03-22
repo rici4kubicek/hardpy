@@ -274,7 +274,7 @@ The default value is `"hardpy.hardpy_panel.auth.BasicCredentialsAuthAdapter"`.
 
 #### session_timeout
 
-Session timeout in minutes. After this period of inactivity, the user will be automatically logged out.
+Session lifetime in minutes. After this period since login, the user will be automatically logged out.
 Set to `0` to disable session timeout (sessions never expire).
 The default value is `0`.
 
