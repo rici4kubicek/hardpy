@@ -316,8 +316,8 @@ function App({ syncDocumentId }: { syncDocumentId: string }): JSX.Element {
 
     const response = await fetch(url, mergedOptions);
 
-    if (response.status === 401 && authRequired) {
-      // Session expired, show login dialog
+    if (response.status === 401) {
+      // Session expired or invalid – always redirect to login
       sessionStorage.removeItem("hardpy_session_token");
       setIsAuthenticated(false);
       setAuthUser(null);
@@ -356,10 +356,16 @@ function App({ syncDocumentId }: { syncDocumentId: string }): JSX.Element {
             "Content-Type": "application/json",
           },
           body: testsJsonString,
-        }).then((response) => response.json()).catch(console.error);
+        }).then((response) => response.json()).catch((error) => {
+          if (error instanceof Error && error.message !== "Authentication required") {
+            console.error(error);
+          }
+        });
       }
     } catch (error) {
-      console.error("Failed to toggle manual collect mode:", error);
+      if (error instanceof Error && error.message !== "Authentication required") {
+        console.error("Failed to toggle manual collect mode:", error);
+      }
     }
   };
 
@@ -496,7 +502,10 @@ function App({ syncDocumentId }: { syncDocumentId: string }): JSX.Element {
         console.error("Failed to set test config");
       }
     } catch (error) {
-      console.error("Error setting test config:", error);
+      // "Authentication required" is intentional (redirect to login) – suppress noise
+      if (error instanceof Error && error.message !== "Authentication required") {
+        console.error("Error setting test config:", error);
+      }
     }
   };
 
