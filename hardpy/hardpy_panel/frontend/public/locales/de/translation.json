@@ -1,6 +1,15 @@
 {
   "app": {
       "title": "HardPy Bedienfeld",
+      "loginTitle": "Bei HardPy anmelden",
+      "loginWithCredentials": "Benutzername / Passwort",
+      "loginWithToken": "Token",
+      "username": "Benutzername",
+      "password": "Passwort",
+      "token": "Token",
+      "login": "Anmelden",
+      "logout": "Abmelden",
+      "loggedInAs": "Angemeldet als",
       "lastLaunch": "Letzter Start:",
       "duration": "Dauer",
       "seconds": "s",

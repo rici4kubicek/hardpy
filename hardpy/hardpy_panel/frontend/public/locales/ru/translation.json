@@ -1,6 +1,15 @@
 {
   "app": {
       "title": "Панель оператора HardPy",
+      "loginTitle": "Вход в HardPy",
+      "loginWithCredentials": "Имя пользователя / Пароль",
+      "loginWithToken": "Токен",
+      "username": "Имя пользователя",
+      "password": "Пароль",
+      "token": "Токен",
+      "login": "Войти",
+      "logout": "Выйти",
+      "loggedInAs": "Вы вошли как",
       "lastLaunch": "Последний запуск:",
       "duration": "Длительность",
       "seconds": "с",

@@ -1,6 +1,15 @@
 {
   "app": {
       "title": "Panneau opérateur HardPy",
+      "loginTitle": "Connexion à HardPy",
+      "loginWithCredentials": "Nom d'utilisateur / Mot de passe",
+      "loginWithToken": "Jeton",
+      "username": "Nom d'utilisateur",
+      "password": "Mot de passe",
+      "token": "Jeton",
+      "login": "Se connecter",
+      "logout": "Se déconnecter",
+      "loggedInAs": "Connecté en tant que",
       "lastLaunch": "Dernière lancement:",
       "duration": "Durée",
       "seconds": "s",

@@ -110,6 +110,15 @@ class App(BaseModel):
 
     Attributes:
         title (str): The title of the application.
+        loginTitle (str): The title shown in the login dialog.
+        loginWithCredentials (str): The label for credential-based login mode.
+        loginWithToken (str): The label for token-based login mode.
+        username (str): The label for the username field.
+        password (str): The label for the password field.
+        token (str): The label for the token field.
+        login (str): The text for the login action button.
+        logout (str): The text for the logout action button.
+        loggedInAs (str): The text showing the currently authenticated user.
         lastLaunch (str): The last launch of the application.
         duration (str): The duration of the application.
         seconds (str): The text for seconds.
@@ -121,9 +130,19 @@ class App(BaseModel):
         dbError (str): The database error message.
         noEntries (str): The message for no entries in the database.
         status (AppStatus): The status of the application.
+        testConfigurationSelector (str): The label for selecting a test configuration.
     """
 
     title: str
+    loginTitle: str
+    loginWithCredentials: str
+    loginWithToken: str
+    username: str
+    password: str
+    token: str
+    login: str
+    logout: str
+    loggedInAs: str
     lastLaunch: str
     duration: str
     seconds: str

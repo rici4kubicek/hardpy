@@ -1,6 +1,15 @@
 {
   "app": {
       "title": "Panel de operador HardPy",
+      "loginTitle": "Iniciar sesión en HardPy",
+      "loginWithCredentials": "Usuario / Contraseña",
+      "loginWithToken": "Token",
+      "username": "Usuario",
+      "password": "Contraseña",
+      "token": "Token",
+      "login": "Iniciar sesión",
+      "logout": "Cerrar sesión",
+      "loggedInAs": "Sesión iniciada como",
       "lastLaunch": "Última lanzamiento:",
       "duration": "Duración",
       "seconds": "s",

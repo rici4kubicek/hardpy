@@ -1,6 +1,15 @@
 {
   "app": {
       "title": "HardPy オペレーターパネル",
+      "loginTitle": "HardPy にログイン",
+      "loginWithCredentials": "ユーザー名 / パスワード",
+      "loginWithToken": "トークン",
+      "username": "ユーザー名",
+      "password": "パスワード",
+      "token": "トークン",
+      "login": "ログイン",
+      "logout": "ログアウト",
+      "loggedInAs": "ログイン中のユーザー",
       "lastLaunch": "最終起動:",
       "duration": "期間",
       "seconds": "秒",

@@ -1,6 +1,15 @@
 {
   "app": {
     "title": "HardPy Panel operátora",
+    "loginTitle": "Přihlášení do HardPy",
+    "loginWithCredentials": "Uživatelské jméno / heslo",
+    "loginWithToken": "Token",
+    "username": "Uživatelské jméno",
+    "password": "Heslo",
+    "token": "Token",
+    "login": "Přihlásit se",
+    "logout": "Odhlásit se",
+    "loggedInAs": "Přihlášen jako",
     "lastLaunch": "Poslední běh:",
     "duration": "Doba trvání",
     "seconds": "s",

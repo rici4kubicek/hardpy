@@ -1,6 +1,15 @@
 {
   "app": {
       "title": "HardPy 操作面板",
+      "loginTitle": "登录 HardPy",
+      "loginWithCredentials": "用户名 / 密码",
+      "loginWithToken": "令牌",
+      "username": "用户名",
+      "password": "密码",
+      "token": "令牌",
+      "login": "登录",
+      "logout": "退出登录",
+      "loggedInAs": "当前登录用户",
       "lastLaunch": "上次启动:",
       "duration": "持续时间",
       "seconds": "秒",
