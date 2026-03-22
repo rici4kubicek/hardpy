@@ -2,6 +2,7 @@
 # GNU General Public License v3.0 (see LICENSE or https://www.gnu.org/licenses/gpl-3.0.txt)
 from __future__ import annotations
 
+import importlib
 import os
 import secrets
 from abc import ABC, abstractmethod
@@ -74,6 +75,17 @@ class AuthService:
         self.current_user: Optional[str] = None
         self.session_token: Optional[str] = None
 
+
+@dataclass
+class DummyAuthAdapter(AuthAdapter):
+    """Adapter for integration/local tests to ensure user-provided adapter loading works."""
+
+    def authenticate(self, username: str, password: str) -> bool:
+        return username == "dummy" and password == "dummy"
+
+    def authenticate_token(self, token: str) -> Optional[str]:
+        return "dummy_user" if token == "dummy_token" else None
+
     def login(self, username: str, password: str) -> str:
         if not self.adapter.authenticate(username, password):
             raise ValueError("Invalid username or password")
@@ -97,3 +109,36 @@ class AuthService:
         if not self.auth_required:
             return True
         return self.current_user is not None
+
+
+def load_auth_adapter() -> AuthAdapter:
+    """Load user-defined authentication adapter from module path."""
+    adapter_path = os.getenv(
+        "HARDPY_AUTH_ADAPTER",
+        "hardpy.hardpy_panel.auth.BasicCredentialsAuthAdapter",
+    )
+
+    if "." not in adapter_path:
+        raise ValueError("HARDPY_AUTH_ADAPTER must be a module path to a class")
+
+    module_name, class_name = adapter_path.rsplit(".", 1)
+
+    module = importlib.import_module(module_name)
+    adapter_cls = getattr(module, class_name, None)
+
+    if adapter_cls is None:
+        raise ImportError(f"Auth adapter class {class_name} not found in {module_name}")
+
+    if not issubclass(adapter_cls, AuthAdapter):
+        raise TypeError(
+            f"Auth adapter {adapter_path} must inherit from AuthAdapter"
+        )
+
+    return adapter_cls()
+
+
+def make_auth_service() -> AuthService:
+    auth_required_str = os.getenv("HARDPY_AUTH_REQUIRED", "false").lower()
+    auth_required = auth_required_str in ("1", "true", "yes", "on")
+    return AuthService(load_auth_adapter(), auth_required=auth_required)
+

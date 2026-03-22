@@ -18,7 +18,7 @@ from fastapi import FastAPI, Query, Request, HTTPException, status
 from fastapi.staticfiles import StaticFiles
 
 from hardpy.common.config import ConfigManager, StorageType
-from hardpy.hardpy_panel.auth import AuthService, BasicCredentialsAuthAdapter
+from hardpy.hardpy_panel.auth import make_auth_service
 from hardpy.pytest_hardpy.pytest_wrapper import PyTestWrapper
 from hardpy.pytest_hardpy.result.report_synchronizer import StandCloudSynchronizer
 
@@ -63,7 +63,7 @@ app.state.sc_synchronizer = StandCloudSynchronizer()
 app.state.executor = ThreadPoolExecutor(max_workers=1)
 app.state.manual_collect_mode = False
 app.state.selected_tests = []
-app.state.auth_service = AuthService(BasicCredentialsAuthAdapter(), auth_required=False)
+app.state.auth_service = make_auth_service()
 
 
 class Status(str, Enum):

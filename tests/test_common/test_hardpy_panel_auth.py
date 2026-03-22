@@ -2,6 +2,7 @@ from fastapi.testclient import TestClient
 import os
 
 from hardpy.hardpy_panel.api import app
+from hardpy.hardpy_panel.auth import make_auth_service
 
 client = TestClient(app)
 
@@ -52,3 +53,27 @@ def test_supports_token_login():
         assert start_resp.status_code != 401
 
     del os.environ["HARDPY_AUTH_TOKEN"]
+
+
+def test_custom_auth_adapter_from_env():
+    os.environ["HARDPY_AUTH_ADAPTER"] = "hardpy.hardpy_panel.auth.DummyAuthAdapter"
+    os.environ["HARDPY_AUTH_REQUIRED"] = "true"
+
+    app.state.auth_service = make_auth_service()
+    app.state.auth_service.logout()
+
+    with TestClient(app) as client_local:
+        bad_resp = client_local.post("/api/login", json={"username": "notdummy", "password": "nope"})
+        assert bad_resp.status_code == 401
+
+        good_resp = client_local.post("/api/login", json={"username": "dummy", "password": "dummy"})
+        assert good_resp.status_code == 200
+        assert good_resp.json()["status"] == "success"
+        assert app.state.auth_service.current_user == "dummy"
+
+        start_resp = client_local.get("/api/start")
+        assert start_resp.status_code != 401
+
+    del os.environ["HARDPY_AUTH_ADAPTER"]
+    del os.environ["HARDPY_AUTH_REQUIRED"]
+    app.state.auth_service = make_auth_service()
