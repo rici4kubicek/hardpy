@@ -56,6 +56,11 @@ connection_only = true
 autosync = true
 autosync_timeout = 30
 api-key = "1234567890"
+
+[auth]
+required = true
+adapter = "hardpy.hardpy_panel.auth.BasicCredentialsAuthAdapter"
+session_timeout = 60
 ```
 
 ## Configuration fields description
@@ -243,6 +248,35 @@ The default value is `30`.
 #### api-key
 
 **StandCloud** API key.
+
+### auth
+
+Authentication settings for the HardPy panel.
+
+```toml
+[auth]
+required = true
+adapter = "hardpy.hardpy_panel.auth.BasicCredentialsAuthAdapter"
+session_timeout = 60
+```
+
+#### required
+
+Boolean variable, if set to `true`, authentication is required to access the HardPy panel.
+When enabled, users must log in before accessing the operator interface.
+The default value is `false`.
+
+#### adapter
+
+Python module path to the authentication adapter class.
+The adapter must implement the `AuthAdapter` interface.
+The default value is `"hardpy.hardpy_panel.auth.BasicCredentialsAuthAdapter"`.
+
+#### session_timeout
+
+Session timeout in minutes. After this period of inactivity, the user will be automatically logged out.
+Set to `0` to disable session timeout (sessions never expire).
+The default value is `0`.
 
 ### test_configs
 

@@ -134,3 +134,26 @@ password = "testpass"
 
         # Reset singleton
         ConfigManager._instance = None
+
+
+def test_session_timeout():
+    """Test that sessions automatically expire after timeout."""
+    from datetime import datetime, timedelta
+    from hardpy.hardpy_panel.auth import AuthService, BasicCredentialsAuthAdapter
+    
+    # Create auth service with 1 minute timeout
+    adapter = BasicCredentialsAuthAdapter()
+    auth_service = AuthService(adapter, auth_required=True)
+    auth_service.session_timeout_minutes = 1  # 1 minute timeout
+    
+    # Login
+    token = auth_service.login("dev", "dev")
+    assert auth_service.is_authenticated() is True
+    
+    # Manually set session start time to 2 minutes ago to simulate timeout
+    auth_service.session_start_time = datetime.now() - timedelta(minutes=2)
+    
+    # Check authentication - should auto-logout due to timeout
+    assert auth_service.is_authenticated() is False
+    assert auth_service.current_user is None
+    assert auth_service.session_token is None

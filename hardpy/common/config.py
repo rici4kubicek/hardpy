@@ -101,6 +101,7 @@ class AuthConfig(BaseModel):
 
     required: bool = False
     adapter: str = "hardpy.hardpy_panel.auth.BasicCredentialsAuthAdapter"
+    session_timeout: int = 0  # Session timeout in minutes, 0 means no timeout
 
 
 class TestConfig(BaseModel):

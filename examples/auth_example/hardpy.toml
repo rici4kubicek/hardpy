@@ -15,6 +15,7 @@ language = "en"
 [auth]
 required = true
 adapter = "conftest.CustomAuthAdapter"
+session_timeout = 60  # 60 minutes session timeout
 
 [stand_cloud]
 address = "standcloud.io"

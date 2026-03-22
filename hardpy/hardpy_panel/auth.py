@@ -7,6 +7,7 @@ import os
 import secrets
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
+from datetime import datetime, timedelta
 from typing import Optional
 
 from hardpy.common.config import ConfigManager
@@ -74,12 +75,15 @@ class AuthService:
         self.auth_required = auth_required
         self.current_user: Optional[str] = None
         self.session_token: Optional[str] = None
+        self.session_start_time: Optional[datetime] = None
+        self.session_timeout_minutes = ConfigManager().config.auth.session_timeout
 
     def login(self, username: str, password: str) -> str:
         if not self.adapter.authenticate(username, password):
             raise ValueError("Invalid username or password")
         self.current_user = username
         self.session_token = secrets.token_hex(32)
+        self.session_start_time = datetime.now()
         return self.session_token
 
     def login_with_token(self, token: str) -> str:
@@ -88,16 +92,29 @@ class AuthService:
             raise ValueError("Invalid token")
         self.current_user = user
         self.session_token = token
+        self.session_start_time = datetime.now()
         return user
 
     def logout(self) -> None:
         self.current_user = None
         self.session_token = None
+        self.session_start_time = None
 
     def is_authenticated(self) -> bool:
         if not self.auth_required:
             return True
-        return self.current_user is not None
+        
+        if self.current_user is None:
+            return False
+            
+        # Check session timeout
+        if self.session_timeout_minutes > 0 and self.session_start_time:
+            elapsed = datetime.now() - self.session_start_time
+            if elapsed > timedelta(minutes=self.session_timeout_minutes):
+                self.logout()  # Auto logout on timeout
+                return False
+                
+        return True
 
 
 def load_auth_adapter() -> AuthAdapter:

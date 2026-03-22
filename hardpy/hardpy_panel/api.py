@@ -216,11 +216,23 @@ def assert_authenticated() -> None:
 
 @app.get("/api/auth_status")
 def auth_status() -> dict:
-    return {
-        "authenticated": app.state.auth_service.is_authenticated(),
-        "user": app.state.auth_service.current_user,
-        "auth_required": app.state.auth_service.auth_required,
+    auth_service = app.state.auth_service
+    response = {
+        "authenticated": auth_service.is_authenticated(),
+        "user": auth_service.current_user,
+        "auth_required": auth_service.auth_required,
     }
+    
+    # Add session expiry info if authenticated and timeout is configured
+    if (auth_service.is_authenticated() and 
+        auth_service.session_timeout_minutes > 0 and 
+        auth_service.session_start_time):
+        from datetime import datetime, timedelta
+        expiry_time = auth_service.session_start_time + timedelta(minutes=auth_service.session_timeout_minutes)
+        response["session_expires_at"] = expiry_time.isoformat()
+        response["session_timeout_minutes"] = auth_service.session_timeout_minutes
+    
+    return response
 
 
 @app.post("/api/login")
