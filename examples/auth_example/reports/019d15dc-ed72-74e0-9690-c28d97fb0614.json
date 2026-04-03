@@ -1,0 +1,81 @@
+{
+  "status": "passed",
+  "stop_time": 1774188293,
+  "start_time": 1774188291,
+  "name": "Authorization Example",
+  "rev": "19-0481b8dbe6705b01a86e95dfe94940a8",
+  "id": "019d15dc-ed72-74e0-9690-c28d97fb0614",
+  "test_stand": {
+    "hw_id": "dc0509bdae4445eab56c01c611816256",
+    "name": null,
+    "revision": null,
+    "timezone": "Europe/Prague",
+    "location": null,
+    "number": null,
+    "drivers": {},
+    "instruments": [],
+    "info": {}
+  },
+  "dut": {
+    "name": null,
+    "type": null,
+    "serial_number": null,
+    "part_number": null,
+    "revision": null,
+    "sub_units": [],
+    "info": {}
+  },
+  "process": {
+    "name": null,
+    "number": null,
+    "info": {}
+  },
+  "modules": {
+    "test_1": {
+      "status": "passed",
+      "stop_time": 1774188293,
+      "start_time": 1774188291,
+      "name": "test_1",
+      "cases": {
+        "test_minute_parity": {
+          "status": "passed",
+          "stop_time": 1774188291,
+          "start_time": 1774188291,
+          "name": "test_minute_parity",
+          "assertion_msg": null,
+          "msg": {
+            "updated_status": "Current attempt 1",
+            "9aef9c5d-77df-44f2-a422-7806b1972da4": "Current minute 4"
+          },
+          "measurements": [],
+          "chart": null,
+          "attempt": 1,
+          "group": "main",
+          "artifact": {
+            "minute": 4
+          }
+        },
+        "test_dialog_box": {
+          "status": "passed",
+          "stop_time": 1774188293,
+          "start_time": 1774188291,
+          "name": "test_dialog_box",
+          "assertion_msg": null,
+          "msg": null,
+          "measurements": [],
+          "chart": null,
+          "attempt": 1,
+          "group": "main",
+          "artifact": {}
+        }
+      },
+      "group": "main",
+      "artifact": {}
+    }
+  },
+  "user": null,
+  "batch_serial_number": null,
+  "caused_dut_failure_id": null,
+  "error_code": null,
+  "artifact": {}
+}
