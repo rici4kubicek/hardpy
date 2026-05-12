@@ -20,6 +20,7 @@ import {
 import StartStopButton from "./button/StartStop";
 import { TestRunI } from "./hardpy_test_view/SuiteList";
 import SuiteList from "./hardpy_test_view/SuiteList";
+import TestHistory from "./hardpy_test_view/TestHistory";
 import ProgressView from "./progress/ProgressView";
 import TestStatus from "./hardpy_test_view/TestStatus";
 import ReloadAlert from "./restart_alert/RestartAlert";
@@ -212,6 +213,8 @@ function App({ syncDocumentId }: { syncDocumentId: string }): JSX.Element {
   const [previousTestStructure, setPreviousTestStructure] =
     React.useState<string>("");
   let [selectedTests, setSelectedTests] = React.useState<string[]>([]);
+  const [selectedHistoryRunId, setSelectedHistoryRunId] =
+    React.useState<string | null>(null);
 
   /**
    * Loads HardPy configuration from the backend API on component mount
@@ -695,6 +698,27 @@ function App({ syncDocumentId }: { syncDocumentId: string }): JSX.Element {
     }
 
     const document_row = rows[index];
+    const historyEntries = rows
+      .map((row) => {
+        const doc = row.doc as TestRunI | undefined;
+        if (!doc || !doc.name || !doc.status) {
+          return null;
+        }
+
+        return {
+          id: row.id,
+          name: doc.name,
+          status: doc.status,
+          start_time: doc.start_time,
+          serial_number: doc.dut?.serial_number,
+        };
+      })
+      .filter((entry): entry is { id: string; name: string; status: string; start_time?: number; serial_number?: string | number } => entry !== null)
+      .sort((a, b) => (b.start_time ?? 0) - (a.start_time ?? 0));
+
+    const selectedHistoryRow = selectedHistoryRunId
+      ? (rows.find((row) => row.id === selectedHistoryRunId)?.doc as TestRunI | undefined)
+      : undefined;
 
     if (!document_row) {
       return (
@@ -714,30 +738,62 @@ function App({ syncDocumentId }: { syncDocumentId: string }): JSX.Element {
           style={{ display: "flex", flexDirection: "row" }}
         >
           {(ultrawide || !use_debug_info) && (
-            <Card
+            <div
               style={{
-                flexDirection: "column",
-                padding: "20px",
+                display: "flex",
+                flexDirection: ultrawide ? "row" : "column",
                 flexGrow: 1,
                 flexShrink: 1,
-                marginTop: "20px",
-                marginBottom: "20px",
+                gap: "20px",
               }}
             >
-              <SuiteList
-                db_state={testRunData}
-                defaultClose={!ultrawide}
-                onTestsSelectionChange={handleTestsSelectionChange}
-                selectedTests={selectedTests}
-                selectionSupported={
-                  (appConfig?.frontend?.manual_collect || false) &&
-                  manualCollectMode
-                }
-                currentTestConfig={appConfig?.current_test_config}
-                measurementDisplay={appConfig?.frontend?.measurement_display}
-                manualCollectMode={manualCollectMode}
-              />
-            </Card>
+              <Card
+                style={{
+                  flexDirection: "column",
+                  padding: "20px",
+                  flexGrow: 3,
+                  flexShrink: 1,
+                  marginTop: "20px",
+                  marginBottom: "20px",
+                }}
+              >
+                <SuiteList
+                  db_state={testRunData}
+                  defaultClose={!ultrawide}
+                  onTestsSelectionChange={handleTestsSelectionChange}
+                  selectedTests={selectedTests}
+                  selectionSupported={
+                    (appConfig?.frontend?.manual_collect || false) &&
+                    manualCollectMode
+                  }
+                  currentTestConfig={appConfig?.current_test_config}
+                  measurementDisplay={appConfig?.frontend?.measurement_display}
+                  manualCollectMode={manualCollectMode}
+                />
+              </Card>
+
+              <div style={{ display: "flex", flexDirection: "column", flexGrow: 1 }}>
+                <TestHistory
+                  history={historyEntries}
+                  selectedHistoryId={selectedHistoryRunId}
+                  onSelectHistoryRun={(id) => setSelectedHistoryRunId(id)}
+                />
+                {selectedHistoryRow && (
+                  <Card style={{ padding: "20px", marginTop: "20px" }}>
+                    <H2>{t("history.detailTitle")}</H2>
+                    <SuiteList
+                      db_state={selectedHistoryRow}
+                      defaultClose={!ultrawide}
+                      selectionSupported={false}
+                      selectedTests={[]}
+                      currentTestConfig={appConfig?.current_test_config}
+                      measurementDisplay={appConfig?.frontend?.measurement_display}
+                      manualCollectMode={manualCollectMode}
+                    />
+                  </Card>
+                )}
+              </div>
+            </div>
           )}
           {use_debug_info && (
             <Card

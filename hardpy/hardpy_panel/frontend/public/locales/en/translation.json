@@ -69,6 +69,20 @@
     "finishTime": "Finish time",
     "alert": "Alert"
   },
+  "history": {
+    "title": "Test history",
+    "detailTitle": "Test run details",
+    "columns": {
+      "runName": "Run name",
+      "startTime": "Start time",
+      "result": "Result",
+      "serialNumber": "Serial number",
+      "details": "Details"
+    },
+    "viewDetails": "View details",
+    "selected": "Selected",
+    "unknownRun": "Unnamed run"
+  },
   "testSuite": {
     "nameColumn": "Name",
     "dataColumn": "Data",
