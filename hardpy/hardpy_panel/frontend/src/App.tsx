@@ -713,6 +713,7 @@ function App({ syncDocumentId }: { syncDocumentId: string }): JSX.Element {
           serial_number: doc.dut?.serial_number,
         };
       })
+      .filter((entry) => entry && entry.id !== syncDocumentId)
       .filter((entry): entry is { id: string; name: string; status: string; start_time?: number; serial_number?: string | number } => entry !== null)
       .sort((a, b) => (b.start_time ?? 0) - (a.start_time ?? 0));
 
