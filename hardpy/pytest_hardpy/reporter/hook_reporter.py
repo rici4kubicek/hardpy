@@ -5,11 +5,14 @@ from __future__ import annotations
 from copy import deepcopy
 from logging import getLogger
 from time import time
+import json
 
 from natsort import natsorted
 from tzlocal import get_localzone
 
 from hardpy.pytest_hardpy.db import DatabaseField as DF  # noqa: N817
+from hardpy.pytest_hardpy.db.couchdb.statestore import CouchDBStateStore
+from hardpy.pytest_hardpy.db.json.statestore import JsonStateStore
 from hardpy.pytest_hardpy.reporter.base import BaseReporter
 from hardpy.pytest_hardpy.utils import NodeInfo, TestStatus, machine_id
 
@@ -86,6 +89,22 @@ class HookReporter(BaseReporter):
         stop_time = int(time())
         self.set_doc_value(DF.STOP_TIME, stop_time)
         self.set_doc_value(DF.STATUS, status)
+
+        # Save to history
+        timestamp_id = str(int(time()))
+        doc = self._statestore._doc.copy()
+        doc["_id"] = timestamp_id
+        if "_rev" in doc:
+            del doc["_rev"]
+        try:
+            if isinstance(self._statestore, CouchDBStateStore):
+                self._statestore._db.save(doc)
+            elif isinstance(self._statestore, JsonStateStore):
+                history_file = self._statestore._storage_dir / f"{timestamp_id}.json"
+                with history_file.open("w") as f:
+                    json.dump(doc, f)
+        except Exception as e:
+            self._log.warning(f"Failed to save history: {e}")
 
     def compact_all(self) -> None:
         """Compact all databases."""

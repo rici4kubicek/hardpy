@@ -396,27 +396,27 @@ def get_json_data() -> dict:
                 / "storage"
                 / "statestore",
             )
-        _doc_id = config_manager.config.database.doc_id
-        statestore_file = storage_dir / f"{_doc_id}.json"
 
-        if not statestore_file.exists():
+        if not storage_dir.exists():
             return {"rows": [], "total_rows": 0}
 
-        with statestore_file.open("r") as f:
-            data = json.load(f)
-
-        # Format data to match CouchDB's _all_docs format
-        return {
-            "rows": [
-                {
-                    "id": data.get("_id", ""),
-                    "key": data.get("_id", ""),
+        rows = []
+        for json_file in storage_dir.glob("*.json"):
+            try:
+                with json_file.open("r") as f:
+                    data = json.load(f)
+                doc_id = data.get("_id", json_file.stem)
+                rows.append({
+                    "id": doc_id,
+                    "key": doc_id,
                     "value": {"rev": data.get("_rev", "1-0")},
                     "doc": data,
-                },
-            ],
-            "total_rows": 1,
-        }
+                })
+            except Exception as exc:
+                logger.warning(f"Error reading {json_file}: {exc}")
+                continue
+
+        return {"rows": rows, "total_rows": len(rows)}
     except Exception as exc:
         logger.exception("Error reading JSON storage")
         return {"error": str(exc), "rows": [], "total_rows": 0}
