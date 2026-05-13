@@ -65,11 +65,13 @@ const TestHistory: React.FC<Props> = ({
             >
               <td>{entry.name || t("history.unknownRun")}</td>
               <td>{formatTime(entry.start_time)}</td>
-              <td style={{ display: "flex", alignItems: "center", gap: "5px" }}>
-                <TestStatus status={entry.status || ""} />
-                {entry.status
-                  ? t(`app.status.${entry.status}`) || entry.status
-                  : "-"}
+              <td>
+                <div style={{ display: "flex", alignItems: "center", gap: "5px" }}>
+                  <TestStatus status={entry.status || ""} />
+                  {entry.status
+                    ? t(`app.status.${entry.status}`) || entry.status
+                    : "-"}
+                </div>
               </td>
               <td>{entry.serial_number ?? "-"}</td>
               <td>
