@@ -215,6 +215,10 @@ function App({ syncDocumentId }: { syncDocumentId: string }): JSX.Element {
   let [selectedTests, setSelectedTests] = React.useState<string[]>([]);
   const [selectedHistoryRunId, setSelectedHistoryRunId] =
     React.useState<string | null>(null);
+  const [showHistoryDetails, setShowHistoryDetails] =
+    React.useState<boolean>(false);
+  const [historyDisplayCount, setHistoryDisplayCount] =
+    React.useState<number>(5);
 
   /**
    * Loads HardPy configuration from the backend API on component mount
@@ -715,7 +719,8 @@ function App({ syncDocumentId }: { syncDocumentId: string }): JSX.Element {
       })
       .filter((entry) => entry && entry.id !== syncDocumentId)
       .filter((entry): entry is { id: string; name: string; status: string; start_time?: number; serial_number?: string | number } => entry !== null)
-      .sort((a, b) => (b.start_time ?? 0) - (a.start_time ?? 0));
+      .sort((a, b) => (b.start_time ?? 0) - (a.start_time ?? 0))
+      .slice(0, 5);
 
     const selectedHistoryRow = selectedHistoryRunId
       ? (rows.find((row) => row.id === selectedHistoryRunId)?.doc as TestRunI | undefined)
@@ -777,20 +782,33 @@ function App({ syncDocumentId }: { syncDocumentId: string }): JSX.Element {
                 <TestHistory
                   history={historyEntries}
                   selectedHistoryId={selectedHistoryRunId}
-                  onSelectHistoryRun={(id) => setSelectedHistoryRunId(id)}
+                  onSelectHistoryRun={(id) => {
+                    setSelectedHistoryRunId(id);
+                    setShowHistoryDetails(true);
+                  }}
                 />
                 {selectedHistoryRow && (
                   <Card style={{ padding: "20px", marginTop: "20px" }}>
-                    <H2>{t("history.detailTitle")}</H2>
-                    <SuiteList
-                      db_state={selectedHistoryRow}
-                      defaultClose={!ultrawide}
-                      selectionSupported={false}
-                      selectedTests={[]}
-                      currentTestConfig={appConfig?.current_test_config}
-                      measurementDisplay={appConfig?.frontend?.measurement_display}
-                      manualCollectMode={manualCollectMode}
-                    />
+                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                      <H2>{t("history.detailTitle")}</H2>
+                      <Button
+                        minimal
+                        icon={showHistoryDetails ? "chevron-up" : "chevron-down"}
+                        onClick={() => setShowHistoryDetails(!showHistoryDetails)}
+                        title={showHistoryDetails ? "Hide details" : "Show details"}
+                      />
+                    </div>
+                    {showHistoryDetails && (
+                      <SuiteList
+                        db_state={selectedHistoryRow}
+                        defaultClose={!ultrawide}
+                        selectionSupported={false}
+                        selectedTests={[]}
+                        currentTestConfig={appConfig?.current_test_config}
+                        measurementDisplay={appConfig?.frontend?.measurement_display}
+                        manualCollectMode={manualCollectMode}
+                      />
+                    )}
                   </Card>
                 )}
               </div>
