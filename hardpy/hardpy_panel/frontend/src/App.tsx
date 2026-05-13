@@ -702,7 +702,7 @@ function App({ syncDocumentId }: { syncDocumentId: string }): JSX.Element {
     }
 
     const document_row = rows[index];
-    const historyEntries = rows
+    const filteredRows = rows
       .map((row) => {
         const doc = row.doc as TestRunI | undefined;
         if (!doc || !doc.name || !doc.status) {
@@ -719,8 +719,9 @@ function App({ syncDocumentId }: { syncDocumentId: string }): JSX.Element {
       })
       .filter((entry) => entry && entry.id !== syncDocumentId)
       .filter((entry): entry is { id: string; name: string; status: string; start_time?: number; serial_number?: string | number } => entry !== null)
-      .sort((a, b) => (b.start_time ?? 0) - (a.start_time ?? 0))
-      .slice(0, 5);
+      .sort((a, b) => (b.start_time ?? 0) - (a.start_time ?? 0));
+
+    const historyEntries = filteredRows.slice(0, historyDisplayCount);
 
     const selectedHistoryRow = selectedHistoryRunId
       ? (rows.find((row) => row.id === selectedHistoryRunId)?.doc as TestRunI | undefined)
@@ -787,6 +788,16 @@ function App({ syncDocumentId }: { syncDocumentId: string }): JSX.Element {
                     setShowHistoryDetails(true);
                   }}
                 />
+                {filteredRows.length > historyDisplayCount && (
+                  <Button
+                    minimal
+                    fill
+                    onClick={() => setHistoryDisplayCount(historyDisplayCount + 5)}
+                    style={{ marginTop: "10px" }}
+                  >
+                    {t("history.showMore")}
+                  </Button>
+                )}
                 {selectedHistoryRow && (
                   <Card style={{ padding: "20px", marginTop: "20px" }}>
                     <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>

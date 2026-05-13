@@ -81,7 +81,8 @@
     },
     "viewDetails": "View details",
     "selected": "Selected",
-    "unknownRun": "Unnamed run"
+    "unknownRun": "Unnamed run",
+    "showMore": "Show more"
   },
   "testSuite": {
     "nameColumn": "Name",
