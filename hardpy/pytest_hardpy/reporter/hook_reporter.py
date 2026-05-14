@@ -91,7 +91,7 @@ class HookReporter(BaseReporter):
         self.set_doc_value(DF.STATUS, status)
 
         # Save to history
-        timestamp_id = str(int(time()))
+        timestamp_id = str(stop_time)
         doc = self._statestore._doc.copy()
         doc["_id"] = timestamp_id
         if "_rev" in doc:
