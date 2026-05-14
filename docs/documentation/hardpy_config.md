@@ -177,7 +177,7 @@ Enable or disable the test history view in the operator panel.
 When set to `true`, the operator can view the history of previous test runs.
 Default is `true`.
 
-### modal_result
+#### modal_result
 
 Modal result windows settings for test completion display.
 
