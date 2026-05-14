@@ -2,10 +2,10 @@
 # GNU General Public License v3.0 (see LICENSE or https://www.gnu.org/licenses/gpl-3.0.txt)
 from __future__ import annotations
 
+import json
 from copy import deepcopy
 from logging import getLogger
 from time import time
-import json
 
 from natsort import natsorted
 from tzlocal import get_localzone
