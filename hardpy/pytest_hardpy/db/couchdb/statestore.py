@@ -130,7 +130,7 @@ class CouchDBStateStore(StorageInterface):
         doc.pop("_rev", None)
         try:
             self._db.save(doc)
-        except (GenericError, ConnectionError) as e:
+        except (Conflict, GenericError, ConnectionError) as e:
             self._log.warning(f"Failed to save history: {e}")
 
     def _init_doc(self) -> dict:

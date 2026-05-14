@@ -90,7 +90,7 @@ class HookReporter(BaseReporter):
         self.set_doc_value(DF.STATUS, status)
 
         # Save to history
-        timestamp_id = str(stop_time)
+        timestamp_id = str(int(time() * 1000))
         if isinstance(self._statestore, (CouchDBStateStore, JsonStateStore)):
             self._statestore.save_history(timestamp_id)
 
