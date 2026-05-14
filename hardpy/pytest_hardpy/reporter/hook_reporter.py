@@ -2,7 +2,6 @@
 # GNU General Public License v3.0 (see LICENSE or https://www.gnu.org/licenses/gpl-3.0.txt)
 from __future__ import annotations
 
-import json
 from copy import deepcopy
 from logging import getLogger
 from time import time
@@ -92,19 +91,8 @@ class HookReporter(BaseReporter):
 
         # Save to history
         timestamp_id = str(stop_time)
-        doc = self._statestore._doc.copy()
-        doc["_id"] = timestamp_id
-        if "_rev" in doc:
-            del doc["_rev"]
-        try:
-            if isinstance(self._statestore, CouchDBStateStore):
-                self._statestore._db.save(doc)
-            elif isinstance(self._statestore, JsonStateStore):
-                history_file = self._statestore._storage_dir / f"{timestamp_id}.json"
-                with history_file.open("w") as f:
-                    json.dump(doc, f)
-        except Exception as e:
-            self._log.warning(f"Failed to save history: {e}")
+        if isinstance(self._statestore, (CouchDBStateStore, JsonStateStore)):
+            self._statestore.save_history(timestamp_id)
 
     def compact_all(self) -> None:
         """Compact all databases."""

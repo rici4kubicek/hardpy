@@ -372,6 +372,15 @@ def get_storage_type() -> dict:
     return {"storage_type": config_manager.config.database.storage_type}
 
 
+def _read_json_history_file(json_file: Path) -> dict | None:
+    try:
+        with json_file.open("r") as f:
+            return json.load(f)
+    except (OSError, json.JSONDecodeError) as exc:
+        logger.warning(f"Error reading {json_file}: {exc}")
+        return None
+
+
 @app.get("/api/json_data")
 def get_json_data() -> dict:
     """Get test run data from JSON storage.
@@ -402,19 +411,16 @@ def get_json_data() -> dict:
 
         rows = []
         for json_file in storage_dir.glob("*.json"):
-            try:
-                with json_file.open("r") as f:
-                    data = json.load(f)
-                doc_id = data.get("_id", json_file.stem)
-                rows.append({
-                    "id": doc_id,
-                    "key": doc_id,
-                    "value": {"rev": data.get("_rev", "1-0")},
-                    "doc": data,
-                })
-            except Exception as exc:
-                logger.warning(f"Error reading {json_file}: {exc}")
+            data = _read_json_history_file(json_file)
+            if data is None:
                 continue
+            doc_id = data.get("_id", json_file.stem)
+            rows.append({
+                "id": doc_id,
+                "key": doc_id,
+                "value": {"rev": data.get("_rev", "1-0")},
+                "doc": data,
+            })
 
         return {"rows": rows, "total_rows": len(rows)}
     except Exception as exc:
